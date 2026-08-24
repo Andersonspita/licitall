@@ -1,0 +1,118 @@
+# LicitAll — serviços locais de infraestrutura
+# Uso: docker compose up -d
+#
+# Portas no host:
+#   5432  PostgreSQL 16 + pgvector (licitall / minhareceita / evolution)
+#   6379  Redis
+#   8001  Minha Receita (consulta CNPJ)
+#   8080  Evolution API (WhatsApp)
+#   3000  Evolution Manager (QR / instâncias)
+#
+# A API FastAPI do LicitAll roda fora do Compose: uvicorn src.main:app --reload --port 8000
+
+name: licitall
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: licitall-postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-licitall}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-licitall}
+      POSTGRES_DB: ${POSTGRES_DB:-licitall}
+    volumes:
+      - licitall_pgdata:/var/lib/postgresql/data
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-licitall} -d ${POSTGRES_DB:-licitall}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks:
+      - licitall
+
+  redis:
+    image: redis:7-alpine
+    container_name: licitall-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - licitall_redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - licitall
+
+  minha-receita:
+    image: atcr.io/cuducos.me/minha-receita:latest
+    container_name: licitall-minha-receita
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8001:8000"
+    environment:
+      PORT: "8000"
+      DATABASE_URL: postgres://${POSTGRES_USER:-licitall}:${POSTGRES_PASSWORD:-licitall}@postgres:5432/minhareceita?sslmode=disable
+    volumes:
+      - ./data/minha-receita:/mnt/data
+    # Imagem distroless: sem shell/curl para healthcheck HTTP.
+    networks:
+      - licitall
+
+  evolution-api:
+    image: evoapicloud/evolution-api:latest
+    container_name: licitall-evolution-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    env_file:
+      - ./docker/evolution.env
+    environment:
+      SERVER_URL: ${EVOLUTION_SERVER_URL:-http://localhost:8080}
+      AUTHENTICATION_API_KEY: ${EVOLUTION_API_KEY:-licitall-dev-evolution-key}
+      DATABASE_PROVIDER: postgresql
+      DATABASE_CONNECTION_URI: postgresql://${POSTGRES_USER:-licitall}:${POSTGRES_PASSWORD:-licitall}@postgres:5432/evolution?schema=evolution_api
+      CACHE_REDIS_ENABLED: "true"
+      CACHE_REDIS_URI: redis://redis:6379/6
+      CACHE_REDIS_PREFIX_KEY: evolution
+    volumes:
+      - evolution_instances:/evolution/instances
+    networks:
+      - licitall
+
+  evolution-frontend:
+    image: evoapicloud/evolution-manager:latest
+    container_name: licitall-evolution-frontend
+    restart: unless-stopped
+    depends_on:
+      - evolution-api
+    ports:
+      - "3000:80"
+    networks:
+      - licitall
+
+volumes:
+  licitall_pgdata:
+  licitall_redis:
+  evolution_instances:
+
+networks:
+  licitall:
+    name: licitall
+    driver: bridge

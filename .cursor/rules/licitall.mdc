@@ -1,0 +1,37 @@
+---
+description: Diretrizes mestres de arquitetura e desenvolvimento do LicitAll
+alwaysApply: true
+---
+
+# LicitAll
+
+Plataforma B2G de automação do ciclo de vendas públicas. Código novo somente em `src/` (ou `app/`). Não clone de novo os repositórios da raiz e não altere o código-fonte de `DS4SD.Docling`, `langgraph`, `crewAI-examples`, `ragflow`, `minha-receita`, `querido-diario` ou `evolution-api`.
+
+## Stack
+
+- Python 3.11+, FastAPI, Pydantic v2, SQLModel / SQLAlchemy async, PostgreSQL 16 + pgvector, Redis
+- PNCP (`https://pncp.gov.br/api/consulta/v1/contratacoes/publicacao`) para ingestão
+- Docling local para OCR/parse; LangGraph para o grafo de agentes; Minha Receita para CNPJ; Evolution API para WhatsApp
+
+## Módulos (`src/`)
+
+1. `ingestion/` — client PNCP, download de Edital/TR em `data/raw/{id_licitacao}`
+2. `parser/` — wrapper Docling → Markdown segmentado
+3. `agents/` — extractor (Pydantic), legal RAG (Lei 14.133 + TCU), checklist de habilitação
+4. `matching/` — CNAE + geo + porte via Minha Receita (apenas empresas ATIVAS)
+5. `advisory/` — minutas com disclaimer Lei 8.906/1994
+6. `outreach/` — templates Evolution API
+
+## Compliance
+
+- Lei 14.133/2021 e LC 123/2006; prazos de impugnação em dias úteis (Art. 164)
+- Nunca inventar exigências, certidões ou prazos ausentes do edital; citar página/parágrafo do Docling
+- Toda peça gerada leva rodapé de minuta de suporte de IA, exigindo revisão humana
+
+## Ordem de implementação
+
+Fase 1 fundação/PNCP → Fase 2 Docling/schemas → Fase 3 LangGraph/RAG → Fase 4 matchmaking → Fase 5 peças e WhatsApp
+
+## Documentação (obrigatório manter)
+
+Ao concluir tarefas relevantes, atualizar: `docs/fase/STATUS.md`, `README.md`, `docs/tecnica/*` e/ou `docs/usuario/*`, além de `AGENTS.md` se mudar regras de implementação. O GitHub versiona só o produto LicitAll — não commits dos clones de referência da raiz.
