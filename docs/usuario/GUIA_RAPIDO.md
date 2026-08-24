@@ -4,9 +4,8 @@
 
 1. Busca licitações publicadas no PNCP  
 2. Baixa editais e termos de referência  
-3. (Fases seguintes) Analisa documentos, encontra empresas elegíveis e envia alertas
-
-Hoje (Fase 1) você já consegue **sincronizar** e **baixar** documentos.
+3. Converte PDFs em texto estruturado e monta um resumo do edital (Lei 14.133/2021)  
+4. (Fases seguintes) Encontra empresas elegíveis e envia alertas
 
 ## Subir o ambiente (dev)
 
@@ -15,26 +14,18 @@ Hoje (Fase 1) você já consegue **sincronizar** e **baixar** documentos.
 3. Ative o venv e rode `uvicorn src.main:app --reload --port 8000`  
 4. Abra http://localhost:8000/docs
 
-## Sincronizar editais
+## Fluxo do dia a dia (Fase 2)
 
-No Swagger, use `POST /ingestion/pncp/sync` ou:
+1. **Sincronizar** — `POST /ingestion/pncp/sync` (ex.: `{"uf":"SP","only_open":true}`)  
+2. **Baixar anexos** — `POST /ingestion/pncp/{numeroControlePNCP}/documents`  
+3. **Parsear** — `POST /parser/{numeroControlePNCP}`  
+4. **Extrair** — `POST /agents/{numeroControlePNCP}/extract`
 
-```bash
-curl -X POST http://localhost:8000/ingestion/pncp/sync ^
-  -H "Content-Type: application/json" ^
-  -d "{\"uf\":\"SP\",\"only_open\":true}"
-```
-
-## Baixar anexos de uma licitação
-
-Use o `numeroControlePNCP` retornado na sync, por exemplo:
-
-`POST /ingestion/pncp/00394452000103-1-000033/2024/documents`
-
-Arquivos ficam em `data/raw/...`.
+O resultado traz objeto, itens (PNCP), benefícios ME/EPP (se constarem no edital), checklist só com documentos citados e prazo de impugnação (edital ou Art. 164).
 
 ## Avisos importantes
 
-- Textos de proposta/impugnação gerados depois serão **minutas**: precisam de revisão humana/advogado (Lei 8.906/1994).  
-- O sistema não deve inventar exigências que não estejam no edital.  
-- Minha Receita só encontra empresas depois que a base CNPJ estiver carregada no serviço.
+- Marco legal: **Lei 14.133/2021** (nova lei de licitações).  
+- Textos de proposta/impugnação futuros serão **minutas**: revisão humana/advogado (Lei 8.906/1994).  
+- O sistema **não inventa** certidões que não estejam no edital.  
+- Impugnação: em regra, até **3 dias úteis** antes da abertura (Art. 164), se o edital não fixar outra data válida.

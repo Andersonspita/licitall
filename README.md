@@ -4,9 +4,9 @@ Plataforma B2G de automação do ciclo de vendas públicas: mineração PNCP →
 
 ## Status atual
 
-**Fase 1 — Fundação e ingestão PNCP** (em andamento / bootstrap concluído).
+**Fase 2 — Parsing Docling / schemas** (núcleo pronto), sob a **Lei 14.133/2021**.
 
-Detalhes: [docs/fase/STATUS.md](docs/fase/STATUS.md) · Técnica: [docs/tecnica/ARQUITETURA.md](docs/tecnica/ARQUITETURA.md) · Usuário: [docs/usuario/GUIA_RAPIDO.md](docs/usuario/GUIA_RAPIDO.md) · Devs/IA: [AGENTS.md](AGENTS.md)
+Detalhes: [docs/fase/STATUS.md](docs/fase/STATUS.md) · Compliance: [docs/tecnica/COMPLIANCE_14133.md](docs/tecnica/COMPLIANCE_14133.md) · Fase 2: [docs/tecnica/FASE2_PARSING.md](docs/tecnica/FASE2_PARSING.md) · Usuário: [docs/usuario/GUIA_RAPIDO.md](docs/usuario/GUIA_RAPIDO.md) · Devs/IA: [AGENTS.md](AGENTS.md)
 
 ## O que entra neste repositório
 
@@ -29,17 +29,19 @@ uvicorn src.main:app --reload --port 8000
 - Docs OpenAPI: http://localhost:8000/docs  
 - Postgres+pgvector: `5432` · Redis: `6379` · Minha Receita: `8001` · Evolution: `8080`
 
-## Endpoints úteis (Fase 1)
+## Endpoints úteis
 
 - `GET /health`
 - `POST /ingestion/pncp/sync` — sincroniza publicações PNCP
 - `POST /ingestion/pncp/{id_pncp}/documents` — baixa Edital/TR em `data/raw/`
 - `GET /ingestion/pncp/{id_pncp}/itens`
+- `POST /parser/{id_pncp}` — Markdown segmentado (Docling)
+- `POST /agents/{id_pncp}/extract` — `TenderSchema` + checklist + Art. 164
 
 ## Deploy na VPS
 
-Ver [docs/tecnica/DEPLOY_VPS.md](docs/tecnica/DEPLOY_VPS.md).
+Adiado. Guia: [docs/tecnica/DEPLOY_VPS.md](docs/tecnica/DEPLOY_VPS.md).
 
 ## Compliance
 
-Peças geradas são **minutas de suporte de IA** (Lei 8.906/1994): exigem revisão humana. Extrações devem citar página/parágrafo do edital; prazos de impugnação em dias úteis (Art. 164, Lei 14.133/2021).
+Marco: **Lei 14.133/2021**. Peças futuras são minutas (Lei 8.906/1994). Extrações citam página/parágrafo; impugnação em **dias úteis** (Art. 164). Ver [docs/tecnica/COMPLIANCE_14133.md](docs/tecnica/COMPLIANCE_14133.md).

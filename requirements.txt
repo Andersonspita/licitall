@@ -27,5 +27,9 @@ langgraph-checkpoint-postgres>=2.0.0
 
 redis>=5.2.0
 
-# Parser (Fase 2). Instalação pesada; no Windows pode exigir extras de sistema.
+# Parser (Fase 2). Docling é pesado; pypdfium2 serve de fallback de texto.
 docling>=2.22.0
+pypdfium2>=4.30.0
+
+# Testes
+pytest>=8.3.0

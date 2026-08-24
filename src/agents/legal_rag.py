@@ -1,6 +1,11 @@
 from __future__ import annotations
 
-from src.models.schemas import LegalRiskItem
+import re
+
+from src.compliance.lei_14133 import LEI_14133_REF
+from src.models.enums import LegalAction
+from src.models.schemas import DocumentRef, LegalRiskItem
+from src.parser.docling_parser import ParsedDocument, refs_from_markdown
 
 LEGAL_CORPUS_HINTS = (
     "Lei Federal nº 14.133/2021",
@@ -8,15 +13,67 @@ LEGAL_CORPUS_HINTS = (
     "Jurisprudência consolidada do TCU",
 )
 
-RESTRICTIVE_PATTERNS = (
-    "exigência de marca sem justificativa",
-    "capital social mínimo acima de 10%",
-    "prazo de vistoria técnica incompatível com o Art. 63",
+# Triagem determinística (Fase 3 parcial). RAG vetorial entra depois.
+_RISK_RULES: tuple[tuple[re.Pattern[str], str, str, LegalAction], ...] = (
+    (
+        re.compile(r"marca\s+(?:de\s+)?refer[eê]ncia|somente da marca|marca exclusiv", re.I),
+        "Possível restrição por marca sem verificar justificativa técnica no trecho.",
+        f"Art. 41 e princípios do Art. 5º da {LEI_14133_REF}; orientação TCU contra direcionamento.",
+        LegalAction.PEDIDO_ESCLARECIMENTO,
+    ),
+    (
+        re.compile(r"capital social m[ií]nimo.{0,40}(\d{1,3}(?:\.\d{3})*(?:,\d+)?\s*%|\d+\s*%)", re.I),
+        "Exigência de capital social mínimo percentual — verificar se excede parâmetros do TCU (~10%).",
+        f"Art. 69 da {LEI_14133_REF}; jurisprudência TCU sobre onerosidade excessiva.",
+        LegalAction.PEDIDO_ESCLARECIMENTO,
+    ),
+    (
+        re.compile(r"vistoria t[eé]cnica.{0,80}(obrigat[oó]ria|imprescind[ií]vel)", re.I),
+        "Vistoria técnica obrigatória pode ser restritiva se o prazo/local inviabilizar competição.",
+        f"Art. 63 e Art. 67 da {LEI_14133_REF}.",
+        LegalAction.PEDIDO_ESCLARECIMENTO,
+    ),
+    (
+        re.compile(r"impugna[cç][aã]o.{0,60}(\d+)\s*dias?\s*(?:corridos|úteis|uteis)?", re.I),
+        "Conferir se o prazo de impugnação respeita 3 dias úteis antes da abertura (Art. 164).",
+        f"Art. 164 da {LEI_14133_REF}.",
+        LegalAction.PEDIDO_ESCLARECIMENTO,
+    ),
 )
 
 
-def analyze_legal_risks(_markdown: str) -> list[LegalRiskItem]:
-    """Stub da Fase 3: RAG jurídico (pgvector + Lei 14.133/2021 + súmulas TCU)."""
-    raise NotImplementedError(
-        "LegalValidationAgent será implementado na Fase 3 com base vetorial pgvector."
-    )
+def analyze_legal_risks_from_refs(refs: list[DocumentRef]) -> list[LegalRiskItem]:
+    risks: list[LegalRiskItem] = []
+    seen: set[str] = set()
+    for ref in refs:
+        for pattern, motivo, fundamento, acao in _RISK_RULES:
+            match = pattern.search(ref.texto)
+            if not match:
+                continue
+            clausula = match.group(0).strip()
+            key = clausula.lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            risks.append(
+                LegalRiskItem(
+                    clausula=clausula[:400],
+                    motivo_risco=motivo,
+                    fundamentacao_legal=fundamento,
+                    sugestao_acao=acao,
+                    pagina_referencia=ref.pagina,
+                    paragrafo_referencia=ref.paragrafo,
+                )
+            )
+    return risks
+
+
+def analyze_legal_risks(markdown: str) -> list[LegalRiskItem]:
+    return analyze_legal_risks_from_refs(refs_from_markdown(markdown))
+
+
+def analyze_legal_risks_from_parsed(docs: list[ParsedDocument]) -> list[LegalRiskItem]:
+    refs = [ref for doc in docs for ref in doc.refs]
+    if not refs:
+        refs = refs_from_markdown("\n\n".join(doc.markdown for doc in docs))
+    return analyze_legal_risks_from_refs(refs)

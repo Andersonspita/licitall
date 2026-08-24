@@ -10,12 +10,14 @@ from pydantic import BaseModel, Field
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from src import __version__
+from src.agents.pipeline import TenderPipeline
 from src.config import get_settings
 from src.db import get_session, init_db
 from src.ingestion.client import PncpClient, PncpError
 from src.ingestion.service import download_tender_documents, ingest_publicacoes
 from src.ingestion.storage import DocumentStorage
 from src.models.enums import DEFAULT_INGESTION_MODALITIES, ModalityEnum
+from src.parser.service import ParserService
 
 logger = logging.getLogger("licitall")
 
@@ -31,7 +33,10 @@ async def lifespan(_app: FastAPI):
 
 app = FastAPI(
     title="LicitAll",
-    description="Plataforma B2G de ingestão e assessoria pré-certame (Lei 14.133/2021).",
+    description=(
+        "Plataforma B2G de ingestão e assessoria pré-certame. "
+        "Marco legal: Lei Federal nº 14.133/2021 (nova lei de licitações) e LC 123/2006."
+    ),
     version=__version__,
     lifespan=lifespan,
 )
@@ -57,12 +62,21 @@ class DownloadResponse(BaseModel):
     files: list[str]
 
 
+class ParseResponse(BaseModel):
+    id_pncp: str
+    documents: list[dict[str, Any]]
+
+
 @app.get("/health")
 async def health() -> dict[str, Any]:
     settings = get_settings()
+    parser = ParserService().parser
     return {
         "status": "ok",
         "version": __version__,
+        "marco_legal": "Lei Federal nº 14.133/2021",
+        "fase": "2-parsing",
+        "docling_available": parser.docling_available,
         "raw_docs_dir": str(settings.raw_docs_path),
         "minha_receita": settings.minha_receita_base_url,
         "evolution_api": settings.evolution_api_url,
@@ -128,6 +142,48 @@ async def list_itens(id_pncp: str) -> dict[str, Any]:
 @app.get("/ingestion/modalidades")
 async def modalidades() -> dict[str, list[str]]:
     return {"modalidades": [item.value for item in DEFAULT_INGESTION_MODALITIES]}
+
+
+@app.post("/parser/{id_pncp:path}", response_model=ParseResponse)
+async def parse_tender_documents(id_pncp: str) -> ParseResponse:
+    """Converte PDFs em Markdown segmentado (Docling ou fallback)."""
+    service = ParserService()
+    try:
+        docs = service.parse_tender(id_pncp, persist=True)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    if not docs:
+        raise HTTPException(
+            status_code=404,
+            detail="Nenhum PDF/DOCX encontrado em data/raw. Baixe anexos antes (POST .../documents).",
+        )
+    return ParseResponse(
+        id_pncp=id_pncp,
+        documents=[
+            {
+                "file": str(doc.source_path),
+                "engine": doc.engine,
+                "sections": list(doc.sections.keys()),
+                "refs_count": len(doc.refs),
+                "markdown_chars": len(doc.markdown),
+            }
+            for doc in docs
+        ],
+    )
+
+
+@app.post("/agents/{id_pncp:path}/extract")
+async def extract_tender(id_pncp: str) -> dict[str, Any]:
+    """Pipeline Fase 2: parse + TenderSchema + checklist + triagem Art. 164 / Lei 14.133."""
+    pipeline = TenderPipeline()
+    try:
+        return await pipeline.run(id_pncp)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 if __name__ == "__main__":

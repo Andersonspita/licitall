@@ -31,10 +31,12 @@ Estado oficial: `docs/fase/STATUS.md`. Atualize esse arquivo e o README ao concl
 
 ## Compliance (não negociável)
 
-- Lei 14.133/2021 e LC 123/2006  
-- Nunca inventar certidões/prazos ausentes do edital; citar página/parágrafo  
-- Rodapé OAB (Lei 8.906/1994) em toda minuta  
-- Impugnação: até 3 dias **úteis** antes da abertura (Art. 164)
+- **Marco:** Lei Federal nº 14.133/2021 (nova lei). Não usar Lei 8.666 como base do motor.
+- LC 123/2006 para ME/EPP (exclusividade / cota 25%).
+- Nunca inventar certidões/prazos ausentes do edital; citar página/parágrafo.
+- Rodapé OAB (Lei 8.906/1994) em toda minuta.
+- Impugnação: até 3 dias **úteis** antes da abertura (Art. 164) — `src/compliance/lei_14133.py`.
+- Detalhes: `docs/tecnica/COMPLIANCE_14133.md`.
 
 ## Documentação a manter atualizada
 
@@ -42,7 +44,7 @@ Estado oficial: `docs/fase/STATUS.md`. Atualize esse arquivo e o README ao concl
 |-----------|---------|------------------|
 | `README.md` | Todos | Setup, status, links |
 | `docs/fase/STATUS.md` | IA + devs | Toda mudança de fase/tarefa |
-| `docs/tecnica/*` | Devs | Arquitetura, API, deploy |
+| `docs/tecnica/*` | Devs | Arquitetura, API, Fase 2, compliance, deploy |
 | `docs/usuario/*` | Operadores | Fluxos de uso |
 | `AGENTS.md` / `.cursor/rules/` | IA | Regras de implementação |
 
@@ -51,6 +53,9 @@ Estado oficial: `docs/fase/STATUS.md`. Atualize esse arquivo e o README ao concl
 ```bash
 docker compose up -d
 uvicorn src.main:app --reload --port 8000
+pytest tests/test_lei_14133_fase2.py -q
 ```
 
 PNCP modalidades default: Pregão Eletrônico (6), Concorrência Eletrônica (4), Dispensa (8).
+
+Fluxo Fase 2: sync → documents → `POST /parser/{id}` → `POST /agents/{id}/extract`.

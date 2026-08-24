@@ -1,4 +1,5 @@
-from src.ingestion.client import PncpClient, PncpId, parse_id_pncp
-from src.ingestion.storage import DocumentStorage
+"""Ingestão PNCP."""
 
-__all__ = ["PncpClient", "PncpId", "parse_id_pncp", "DocumentStorage"]
+from src.ingestion.client import PncpClient, PncpId, parse_id_pncp
+
+__all__ = ["PncpClient", "PncpId", "parse_id_pncp"]

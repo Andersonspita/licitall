@@ -37,3 +37,14 @@ Lista itens da contratação na API core do PNCP.
 ## `GET /ingestion/modalidades`
 
 Lista modalidades filtradas por padrão na ingestão.
+
+## `POST /parser/{id_pncp}`
+
+Converte anexos em `data/raw/{id}` para Markdown segmentado (Docling ou fallback).  
+Persiste metadados em `data/raw/{id}/_parsed/`.
+
+## `POST /agents/{id_pncp}/extract`
+
+Pipeline Fase 2: parse + `TenderSchema` + checklist (só o que está no texto) + triagem Lei 14.133.  
+`limite_impugnacao` usa data do edital ou cálculo Art. 164 (3 dias úteis).
+

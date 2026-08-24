@@ -24,9 +24,10 @@ Plataforma B2G de automação do ciclo de vendas públicas. Código novo somente
 
 ## Compliance
 
-- Lei 14.133/2021 e LC 123/2006; prazos de impugnação em dias úteis (Art. 164)
+- Lei 14.133/2021 (marco) e LC 123/2006; prazos de impugnação em dias úteis (Art. 164)
 - Nunca inventar exigências, certidões ou prazos ausentes do edital; citar página/parágrafo do Docling
 - Toda peça gerada leva rodapé de minuta de suporte de IA, exigindo revisão humana
+- Detalhes: `docs/tecnica/COMPLIANCE_14133.md`
 
 ## Ordem de implementação
 
