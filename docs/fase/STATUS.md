@@ -18,9 +18,10 @@
 - [x] Download/armazenamento em `data/raw/{id_licitacao}`
 - [x] API FastAPI (`/health`, sync PNCP, download documentos)
 - [x] Documentação inicial (técnica, usuário, fase, AGENTS)
+- [x] Repositório GitHub publicado (apenas produto; refs locais ignoradas)
 - [ ] Validar `docker compose up` completo em máquina de desenvolvimento
 - [ ] Validar sync PNCP real + persistência no Postgres
-- [ ] Preparar deploy VPS (ver `docs/tecnica/DEPLOY_VPS.md`)
+- [ ] Deploy VPS (ver `docs/tecnica/DEPLOY_VPS.md`)
 
 ### Fase 2 — Parsing Docling e schemas
 - [ ] Integrar Docling de ponta a ponta nos PDFs baixados
@@ -45,7 +46,7 @@
 
 ## Próxima ação recomendada
 
-1. Publicar este repositório no GitHub (somente pastas do produto).  
-2. Subir stack na VPS (`docs/tecnica/DEPLOY_VPS.md`).  
-3. Rodar smoke test: `GET /health` + `POST /ingestion/pncp/sync` com janela de 1–2 dias e UF de teste.  
+1. ~~Publicar no GitHub~~ ✅ https://github.com/Andersonspita/licitall  
+2. Smoke test local: `docker compose up -d` + `uvicorn` + `GET /health` + sync PNCP.  
+3. Deploy na VPS (`docs/tecnica/DEPLOY_VPS.md`).  
 4. Iniciar Fase 2 (Docling) após ingestão estável.
