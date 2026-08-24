@@ -27,7 +27,7 @@ Somente em `src/` (ou `app/`). Stack: Python 3.11+, FastAPI, Pydantic v2, SQLMod
 4. Matchmaking Minha Receita  
 5. Peças + Evolution WhatsApp  
 
-Estado oficial: `docs/fase/STATUS.md` (Fase 5 núcleo entregue).
+Estado oficial: `docs/fase/STATUS.md` (Fase 6 integração operacional).
 
 ## Compliance (não negociável)
 

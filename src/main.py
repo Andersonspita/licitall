@@ -21,6 +21,8 @@ from src.matching.service import MatchmakingService
 from src.advisory import CompanyContext, build_document_kit, persist_kit
 from src.outreach import OutreachPayload, OutreachService
 from src.parser.service import ParserService
+from src.infra.health import check_dependencies
+from src.pipeline.orchestrator import run_full_pipeline
 from src.rag.corpus import load_legal_corpus
 from src.rag.retriever import ensure_legal_index, get_legal_store, retrieve_legal_context
 
@@ -80,7 +82,7 @@ async def health() -> dict[str, Any]:
         "status": "ok",
         "version": __version__,
         "marco_legal": "Lei Federal nº 14.133/2021",
-        "fase": "5-advisory-outreach",
+        "fase": "6-integracao-operacional",
         "docling_available": parser.docling_available,
         "legal_chunks": len(load_legal_corpus()),
         "raw_docs_dir": str(settings.raw_docs_path),
@@ -88,6 +90,40 @@ async def health() -> dict[str, Any]:
         "evolution_api": settings.evolution_api_url,
         "evolution_instance": settings.evolution_instance,
     }
+
+
+@app.get("/health/deps")
+async def health_deps() -> dict[str, Any]:
+    """Ping Postgres, Redis, Minha Receita e Evolution API."""
+    return await check_dependencies()
+
+
+class PipelineRunRequest(BaseModel):
+    company: CompanyContext | None = None
+    download_if_missing: bool = True
+    persist_kit: bool = True
+    run_matching: bool = True
+    whatsapp_phone: str | None = None
+    send_whatsapp: bool = False
+
+
+@app.post("/pipeline/{id_pncp}/run")
+async def pipeline_run(id_pncp: str, body: PipelineRunRequest | None = None) -> dict[str, Any]:
+    """Orquestra download → parse/extract → match → kit → preview WhatsApp."""
+    body = body or PipelineRunRequest()
+    try:
+        result = await run_full_pipeline(
+            id_pncp,
+            company=body.company,
+            download_if_missing=body.download_if_missing,
+            persist_kit=body.persist_kit,
+            run_matching=body.run_matching,
+            whatsapp_phone=body.whatsapp_phone,
+            send_whatsapp=body.send_whatsapp,
+        )
+        return result.to_dict()
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Pipeline falhou: {exc}") from exc
 
 
 @app.post("/ingestion/pncp/sync", response_model=IngestResponse)

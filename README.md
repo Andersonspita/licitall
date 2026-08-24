@@ -4,9 +4,9 @@ Plataforma B2G de automação do ciclo de vendas públicas: mineração PNCP →
 
 ## Status atual
 
-**Fase 5 — Peças e WhatsApp** (núcleo). Marco: **Lei 14.133/2021** + disclaimer **Lei 8.906/1994**.
+**Fase 6 — Integração operacional** (pipeline ponta a ponta + health deps). Marco: **Lei 14.133/2021** + disclaimer **Lei 8.906/1994**.
 
-Detalhes: [STATUS](docs/fase/STATUS.md) · [Fase 5](docs/tecnica/FASE5_ADVISORY.md) · [Compliance](docs/tecnica/COMPLIANCE_14133.md) · [Usuário](docs/usuario/GUIA_RAPIDO.md) · [AGENTS](AGENTS.md)
+Detalhes: [STATUS](docs/fase/STATUS.md) · [Fase 6](docs/tecnica/FASE6_INTEGRACAO.md) · [Docker](docs/usuario/OPERACAO_DOCKER.md) · [Compliance](docs/tecnica/COMPLIANCE_14133.md) · [AGENTS](AGENTS.md)
 
 
 ## O que entra neste repositório
@@ -25,6 +25,7 @@ python -m venv .venv
 pip install -r requirements.txt
 uvicorn src.main:app --reload --port 8000
 python scripts/smoke_local.py --api http://127.0.0.1:8000
+python scripts/smoke_compose.py --api http://127.0.0.1:8000
 ```
 
 - API: http://localhost:8000/health  
