@@ -44,7 +44,7 @@ Estado oficial: `docs/fase/STATUS.md`. Atualize esse arquivo e o README ao concl
 |-----------|---------|------------------|
 | `README.md` | Todos | Setup, status, links |
 | `docs/fase/STATUS.md` | IA + devs | Toda mudança de fase/tarefa |
-| `docs/tecnica/*` | Devs | Arquitetura, API, Fase 2, compliance, deploy |
+| `docs/tecnica/*` | Devs | Arquitetura, API, Fases 2–3, compliance, deploy |
 | `docs/usuario/*` | Operadores | Fluxos de uso |
 | `AGENTS.md` / `.cursor/rules/` | IA | Regras de implementação |
 
@@ -53,9 +53,11 @@ Estado oficial: `docs/fase/STATUS.md`. Atualize esse arquivo e o README ao concl
 ```bash
 docker compose up -d
 uvicorn src.main:app --reload --port 8000
-pytest tests/test_lei_14133_fase2.py -q
+pytest tests/ -q
 ```
 
 PNCP modalidades default: Pregão Eletrônico (6), Concorrência Eletrônica (4), Dispensa (8).
 
-Fluxo Fase 2: sync → documents → `POST /parser/{id}` → `POST /agents/{id}/extract`.
+Fluxo Fase 2/3: sync → documents → `POST /parser/{id}` → `POST /rag/index/lei-14133` → `POST /agents/{id}/extract` ou `/graph`.
+
+Corpus jurídico: `data/legal/`. Detalhes: `docs/tecnica/FASE3_RAG.md`.
