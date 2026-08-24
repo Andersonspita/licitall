@@ -24,6 +24,7 @@ python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 uvicorn src.main:app --reload --port 8000
+python scripts/smoke_local.py --api http://127.0.0.1:8000
 ```
 
 - API: http://localhost:8000/health  

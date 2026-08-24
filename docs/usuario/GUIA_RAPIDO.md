@@ -29,9 +29,8 @@ Antes, uma vez: `POST /rag/index/lei-14133`.
 
 O resultado traz objeto, itens, checklist, riscos (Lei 14.133), matches e minutas com **disclaimer OAB** (Lei 8.906/1994). Impugnação só usa vícios detectados no edital.
 
-## Avisos importantes
+## Próximos passos (operador)
 
-- Marco legal: **Lei 14.133/2021** (nova lei de licitações).  
-- Textos de proposta/impugnação futuros serão **minutas**: revisão humana/advogado (Lei 8.906/1994).  
-- O sistema **não inventa** certidões que não estejam no edital.  
-- Impugnação: em regra, até **3 dias úteis** antes da abertura (Art. 164), se o edital não fixar outra data válida.
+1. Ligar Docker Desktop e `docker compose up -d`  
+2. Conectar WhatsApp no Evolution Manager (porta 3000)  
+3. Rodar `python scripts/smoke_local.py --api http://127.0.0.1:8000`

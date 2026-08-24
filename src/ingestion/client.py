@@ -129,7 +129,7 @@ class PncpClient:
             "dataFinal": _as_yyyymmdd(data_final),
             "codigoModalidadeContratacao": codigo,
             "pagina": pagina,
-            "tamanhoPagina": tamanho_pagina or self.settings.pncp_page_size,
+            "tamanhoPagina": max(10, min(int(tamanho_pagina or self.settings.pncp_page_size), 50)),
         }
         if uf:
             params["uf"] = uf.upper()
@@ -189,7 +189,7 @@ class PncpClient:
             "dataFinal": _as_yyyymmdd(data_final),
             "codigoModalidadeContratacao": codigo,
             "pagina": pagina,
-            "tamanhoPagina": tamanho_pagina or self.settings.pncp_page_size,
+            "tamanhoPagina": max(10, min(int(tamanho_pagina or self.settings.pncp_page_size), 50)),
         }
         if uf:
             params["uf"] = uf.upper()
