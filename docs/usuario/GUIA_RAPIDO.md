@@ -20,11 +20,12 @@
 2. **Baixar anexos** — `POST /ingestion/pncp/{numeroControlePNCP}/documents`  
 3. **Parsear** — `POST /parser/{numeroControlePNCP}`  
 4. **Extrair** — `POST /agents/{numeroControlePNCP}/extract` (com RAG da Lei 14.133)  
-5. **Grafo completo (Fase 3)** — `POST /agents/{numeroControlePNCP}/graph`
+5. **Grafo completo** — `POST /agents/{numeroControlePNCP}/graph`  
+6. **Match de empresas** — `POST /matching/{numeroControlePNCP}` (requer Minha Receita com base carregada)
 
 Antes, uma vez: `POST /rag/index/lei-14133`.
 
-O resultado traz objeto, itens (PNCP), benefícios ME/EPP (se constarem no edital), checklist só com documentos citados, prazo de impugnação (edital ou Art. 164) e riscos com fundamentação na Lei 14.133/2021.
+O resultado traz objeto, itens (PNCP), benefícios ME/EPP (se constarem no edital), checklist só com documentos citados, prazo de impugnação (edital ou Art. 164), riscos com fundamentação na Lei 14.133/2021 e, na Fase 4, empresas ATIVAS compatíveis por CNAE/UF/porte.
 
 ## Avisos importantes
 

@@ -129,8 +129,27 @@ async def legal_analyzer_node(state: LicitAllState) -> LicitAllState:
 
 
 async def matcher_node(state: LicitAllState) -> LicitAllState:
-    """Placeholder Fase 4 — matchmaking Minha Receita."""
-    return {"matches": state.get("matches") or []}
+    """Matchmaking Minha Receita: CNAE + UF/município + porte (só ATIVAS)."""
+    from src.matching.service import MatchmakingService
+
+    tender = state.get("tender") or {}
+    if not tender:
+        return {"matches": []}
+    service = MatchmakingService()
+    try:
+        result = await service.match_tender(
+            tender,
+            require_proximity=bool(state.get("uf")),
+            limit=20,
+        )
+        return {"matches": [m.model_dump(mode="json") for m in result.matches]}
+    except Exception as exc:
+        return {
+            "matches": [],
+            "error": state.get("error") or f"matching: {exc}",
+        }
+    finally:
+        await service.aclose()
 
 
 def build_graph():
@@ -171,5 +190,5 @@ async def run_tender_graph(id_pncp: str, *, raw_payload: dict[str, Any] | None =
         "matches": final.get("matches"),
         "error": final.get("error"),
         "marco_legal": "Lei Federal nº 14.133/2021",
-        "fase": 3,
+        "fase": 4,
     }

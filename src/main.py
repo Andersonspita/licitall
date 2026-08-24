@@ -17,6 +17,7 @@ from src.ingestion.client import PncpClient, PncpError
 from src.ingestion.service import download_tender_documents, ingest_publicacoes
 from src.ingestion.storage import DocumentStorage
 from src.models.enums import DEFAULT_INGESTION_MODALITIES, ModalityEnum
+from src.matching.service import MatchmakingService
 from src.parser.service import ParserService
 from src.rag.corpus import load_legal_corpus
 from src.rag.retriever import ensure_legal_index, get_legal_store, retrieve_legal_context
@@ -77,7 +78,7 @@ async def health() -> dict[str, Any]:
         "status": "ok",
         "version": __version__,
         "marco_legal": "Lei Federal nº 14.133/2021",
-        "fase": "3-langgraph-rag",
+        "fase": "4-matching",
         "docling_available": parser.docling_available,
         "legal_chunks": len(load_legal_corpus()),
         "raw_docs_dir": str(settings.raw_docs_path),
@@ -238,6 +239,61 @@ async def run_graph(id_pncp: str) -> dict[str, Any]:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+class MatchRequest(BaseModel):
+    """Busca direta quando o tender já foi extraído (ou payload PNCP enriquecido)."""
+
+    tender: dict[str, Any]
+    limit: int = Field(default=30, ge=1, le=100)
+    min_score: float = Field(default=40.0, ge=0, le=100)
+    require_proximity: bool = False
+
+
+@app.post("/matching/search")
+async def matching_search(body: MatchRequest) -> dict[str, Any]:
+    service = MatchmakingService()
+    try:
+        result = await service.match_tender(
+            body.tender,
+            limit=body.limit,
+            min_score=body.min_score,
+            require_proximity=body.require_proximity,
+        )
+        return result.model_dump(mode="json")
+    finally:
+        await service.aclose()
+
+
+@app.post("/matching/{id_pncp:path}")
+async def matching_for_tender(
+    id_pncp: str,
+    require_proximity: bool = False,
+    limit: int = 30,
+) -> dict[str, Any]:
+    """Extrai o edital (pipeline) e cruza com empresas ATIVAS na Minha Receita."""
+    pipeline = TenderPipeline(use_rag=False)
+    try:
+        extracted = await pipeline.run(id_pncp, fetch_pncp_itens=True)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    tender = (extracted.get("extraction") or {}).get("tender") or {}
+    tender["id_pncp"] = id_pncp
+    service = MatchmakingService()
+    try:
+        result = await service.match_tender(
+            tender,
+            limit=limit,
+            require_proximity=require_proximity,
+        )
+        payload = result.model_dump(mode="json")
+        payload["extraction_sections"] = extracted.get("extraction", {}).get("sections_found")
+        return payload
+    finally:
+        await service.aclose()
 
 
 if __name__ == "__main__":

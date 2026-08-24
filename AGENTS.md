@@ -13,7 +13,7 @@ Referências (só locais / Docker / PyPI):
 | LangGraph | Grafo de agentes |
 | Minha Receita | CNPJ / CNAE / porte |
 | Evolution API | WhatsApp |
-| Querido Diário / RAGFlow / CrewAI examples | Padrões e crawlers (fases futuras) |
+| Querido Diário / RAGFlow / CrewAI examples | Padrões e crawlers |
 
 ## Código novo
 
@@ -27,15 +27,15 @@ Somente em `src/` (ou `app/`). Stack: Python 3.11+, FastAPI, Pydantic v2, SQLMod
 4. Matchmaking Minha Receita  
 5. Peças + Evolution WhatsApp  
 
-Estado oficial: `docs/fase/STATUS.md`. Atualize esse arquivo e o README ao concluir ou iniciar uma fase.
+Estado oficial: `docs/fase/STATUS.md`.
 
 ## Compliance (não negociável)
 
-- **Marco:** Lei Federal nº 14.133/2021 (nova lei). Não usar Lei 8.666 como base do motor.
+- **Marco:** Lei Federal nº 14.133/2021. Não usar Lei 8.666 como base do motor.
 - LC 123/2006 para ME/EPP (exclusividade / cota 25%).
-- Nunca inventar certidões/prazos ausentes do edital; citar página/parágrafo.
+- Nunca inventar certidões/prazos/empresas ausentes das fontes.
 - Rodapé OAB (Lei 8.906/1994) em toda minuta.
-- Impugnação: até 3 dias **úteis** antes da abertura (Art. 164) — `src/compliance/lei_14133.py`.
+- Impugnação: 3 dias **úteis** antes da abertura (Art. 164).
 - Detalhes: `docs/tecnica/COMPLIANCE_14133.md`.
 
 ## Documentação a manter atualizada
@@ -43,8 +43,8 @@ Estado oficial: `docs/fase/STATUS.md`. Atualize esse arquivo e o README ao concl
 | Documento | Público | Quando atualizar |
 |-----------|---------|------------------|
 | `README.md` | Todos | Setup, status, links |
-| `docs/fase/STATUS.md` | IA + devs | Toda mudança de fase/tarefa |
-| `docs/tecnica/*` | Devs | Arquitetura, API, Fases 2–3, compliance, deploy |
+| `docs/fase/STATUS.md` | IA + devs | Toda mudança de fase |
+| `docs/tecnica/*` | Devs | Arquitetura, API, fases, compliance |
 | `docs/usuario/*` | Operadores | Fluxos de uso |
 | `AGENTS.md` / `.cursor/rules/` | IA | Regras de implementação |
 
@@ -56,8 +56,6 @@ uvicorn src.main:app --reload --port 8000
 pytest tests/ -q
 ```
 
-PNCP modalidades default: Pregão Eletrônico (6), Concorrência Eletrônica (4), Dispensa (8).
+Fluxo: sync → documents → parser → `rag/index` → extract ou graph → `matching/{id}`.
 
-Fluxo Fase 2/3: sync → documents → `POST /parser/{id}` → `POST /rag/index/lei-14133` → `POST /agents/{id}/extract` ou `/graph`.
-
-Corpus jurídico: `data/legal/`. Detalhes: `docs/tecnica/FASE3_RAG.md`.
+Docs de fase: `FASE2_PARSING.md`, `FASE3_RAG.md`, `FASE4_MATCHING.md`.

@@ -59,3 +59,12 @@ Indexa corpus `data/legal/` (Lei 14.133 + seed TCU).
 
 Busca no índice jurídico.
 
+## `POST /matching/search`
+
+Body: `{ "tender": { ...TenderSchema-like }, "limit": 30, "min_score": 40, "require_proximity": false }`.  
+Retorna empresas ATIVAS ranqueadas (Minha Receita).
+
+## `POST /matching/{id_pncp}`
+
+Extrai o edital e executa o matchmaking (CNAE + UF + porte / LC 123).
+

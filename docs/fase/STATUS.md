@@ -3,9 +3,9 @@
 > Fonte de verdade da fase atual para IAs e desenvolvedores. Atualizar a cada entrega significativa.
 
 **Última atualização:** 2026-08-24  
-**Fase atual:** 3 — LangGraph + RAG Lei 14.133/2021 (núcleo em andamento)  
+**Fase atual:** 4 — Matchmaking Minha Receita (núcleo)  
 **Repositório:** https://github.com/Andersonspita/licitall  
-**Marco legal:** Lei Federal nº 14.133/2021 (nova lei) + LC 123/2006
+**Marco legal:** Lei Federal nº 14.133/2021 + LC 123/2006
 
 ---
 
@@ -17,23 +17,22 @@
 - [ ] Deploy VPS — **adiado**
 
 ### Fase 2 — Parsing Docling e schemas
-- [x] Compliance Art. 164 + LC 123
-- [x] Docling/fallback, extractor, checklist, endpoints, testes, docs
+- [x] Compliance Art. 164 + LC 123, Docling, extractor, testes, docs
 - [ ] Smoke parse em PDF real do PNCP
 
 ### Fase 3 — LangGraph + RAG jurídico
-- [x] Corpus Lei 14.133 + seed TCU em `data/legal/`
-- [x] `src/rag/` (embeddings, store, retriever)
-- [x] Triagem legal enriquecida com RAG
-- [x] Grafo LangGraph: ingestion → parser → extractor → legal → matcher
-- [x] Endpoints `/rag/index/lei-14133`, `/rag/search`, `/agents/{id}/graph`
-- [x] Docs `docs/tecnica/FASE3_RAG.md`
-- [ ] Expandir corpus com texto integral / mais acórdãos TCU
-- [ ] Checkpoint Postgres do LangGraph em produção
-- [ ] Matcher real (Fase 4)
+- [x] Corpus Lei 14.133, RAG, grafo, endpoints, docs
+- [ ] Expandir corpus / checkpoint Postgres em produção
 
 ### Fase 4 — Matchmaking Minha Receita
-- [ ] ETL/carga CNPJ + score CNAE/geo/porte (só ATIVAS)
+- [x] Mapa heurístico objeto → CNAE
+- [x] Score CNAE + UF/município + porte (só ATIVAS)
+- [x] `MatchmakingService` + respeito a exclusividade ME/EPP (LC 123)
+- [x] Nó `matcher` no LangGraph
+- [x] Endpoints `/matching/search` e `/matching/{id}`
+- [x] Testes `tests/test_fase4_matching.py`
+- [x] Docs `docs/tecnica/FASE4_MATCHING.md`
+- [ ] Validar contra base Minha Receita populada (ETL)
 
 ### Fase 5 — Peças e WhatsApp
 - [ ] Minutas + disclaimer OAB + Evolution
@@ -42,6 +41,5 @@
 
 ## Próxima ação recomendada
 
-1. `POST /rag/index/lei-14133` e validar `GET /rag/search?q=artigo+164`.  
-2. Rodar `POST /agents/{id}/graph` após baixar um edital.  
-3. Expandir corpus TCU e ligar Fase 4 (matching).
+1. Popular Minha Receita (ETL) e testar `POST /matching/{id}`.  
+2. Iniciar **Fase 5**: gerador de minutas (Art. 164) + Evolution WhatsApp.
