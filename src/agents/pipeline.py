@@ -2,22 +2,25 @@ from __future__ import annotations
 
 from typing import Any
 
-from src.agents.checklist import DocumentChecklist, build_checklist_from_parsed
+from src.agents.checklist import build_checklist_from_parsed
 from src.agents.extractor import build_tender_from_sources
-from src.agents.legal_rag import analyze_legal_risks_from_parsed
+from src.agents.legal_rag import analyze_legal_risks_from_parsed, analyze_legal_risks_with_rag
 from src.ingestion.client import PncpClient
 from src.models.schemas import TenderExtractionResult
 from src.parser.service import ParserService
 
 
 class TenderPipeline:
-    """Fase 2: parse Docling → extração Pydantic → checklist + triagem Lei 14.133."""
+    """Parse Docling → extração Pydantic → checklist + triagem Lei 14.133 (RAG na Fase 3)."""
 
     def __init__(
         self,
         parser_service: ParserService | None = None,
+        *,
+        use_rag: bool = True,
     ) -> None:
         self.parser_service = parser_service or ParserService()
+        self.use_rag = use_rag
 
     async def run(
         self,
@@ -43,8 +46,11 @@ class TenderPipeline:
             parsed_docs=parsed_docs,
         )
 
-        checklist: DocumentChecklist = build_checklist_from_parsed(parsed_docs)
-        risks = analyze_legal_risks_from_parsed(parsed_docs)
+        checklist = build_checklist_from_parsed(parsed_docs)
+        if self.use_rag:
+            risks = await analyze_legal_risks_with_rag(parsed_docs)
+        else:
+            risks = analyze_legal_risks_from_parsed(parsed_docs)
 
         tender = extraction.tender.model_copy(
             update={
@@ -75,4 +81,5 @@ class TenderPipeline:
             "checklist": checklist.as_flat_list(),
             "riscos_count": len(risks),
             "marco_legal": "Lei Federal nº 14.133/2021",
+            "rag": self.use_rag,
         }

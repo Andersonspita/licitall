@@ -13,7 +13,6 @@ LEGAL_CORPUS_HINTS = (
     "Jurisprudência consolidada do TCU",
 )
 
-# Triagem determinística (Fase 3 parcial). RAG vetorial entra depois.
 _RISK_RULES: tuple[tuple[re.Pattern[str], str, str, LegalAction], ...] = (
     (
         re.compile(r"marca\s+(?:de\s+)?refer[eê]ncia|somente da marca|marca exclusiv", re.I),
@@ -77,3 +76,28 @@ def analyze_legal_risks_from_parsed(docs: list[ParsedDocument]) -> list[LegalRis
     if not refs:
         refs = refs_from_markdown("\n\n".join(doc.markdown for doc in docs))
     return analyze_legal_risks_from_refs(refs)
+
+
+async def analyze_legal_risks_with_rag(
+    docs: list[ParsedDocument],
+    *,
+    top_k: int = 3,
+) -> list[LegalRiskItem]:
+    """Triagem heurística enriquecida com trechos da Lei 14.133 / TCU (pgvector ou memória)."""
+    from src.rag.retriever import ensure_legal_index, retrieve_legal_context
+
+    await ensure_legal_index()
+    base = analyze_legal_risks_from_parsed(docs)
+    enriched: list[LegalRiskItem] = []
+    for risk in base:
+        hits = await retrieve_legal_context(f"{risk.clausula}\n{risk.motivo_risco}", top_k=top_k)
+        if hits:
+            best = hits[0]
+            fund = (
+                f"{risk.fundamentacao_legal} | RAG: {best.fundamentacao} "
+                f"(score={best.score:.3f}, fonte={best.source})"
+            )
+            enriched.append(risk.model_copy(update={"fundamentacao_legal": fund}))
+        else:
+            enriched.append(risk)
+    return enriched

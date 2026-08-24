@@ -31,9 +31,14 @@ def get_session_factory() -> async_sessionmaker[AsyncSession]:
 
 async def init_db() -> None:
     from src.models.tables import TenderIngest  # noqa: F401
+    from src.rag.store import LegalEmbedding  # noqa: F401
 
     async with get_engine().begin() as conn:
         await conn.run_sync(SQLModel.metadata.create_all)
+        try:
+            await conn.execute(__import__("sqlalchemy").text("CREATE EXTENSION IF NOT EXISTS vector"))
+        except Exception:
+            pass
 
 
 async def get_session() -> AsyncIterator[AsyncSession]:

@@ -18,6 +18,8 @@ from src.ingestion.service import download_tender_documents, ingest_publicacoes
 from src.ingestion.storage import DocumentStorage
 from src.models.enums import DEFAULT_INGESTION_MODALITIES, ModalityEnum
 from src.parser.service import ParserService
+from src.rag.corpus import load_legal_corpus
+from src.rag.retriever import ensure_legal_index, get_legal_store, retrieve_legal_context
 
 logger = logging.getLogger("licitall")
 
@@ -75,8 +77,9 @@ async def health() -> dict[str, Any]:
         "status": "ok",
         "version": __version__,
         "marco_legal": "Lei Federal nº 14.133/2021",
-        "fase": "2-parsing",
+        "fase": "3-langgraph-rag",
         "docling_available": parser.docling_available,
+        "legal_chunks": len(load_legal_corpus()),
         "raw_docs_dir": str(settings.raw_docs_path),
         "minha_receita": settings.minha_receita_base_url,
         "evolution_api": settings.evolution_api_url,
@@ -176,10 +179,61 @@ async def parse_tender_documents(id_pncp: str) -> ParseResponse:
 
 @app.post("/agents/{id_pncp:path}/extract")
 async def extract_tender(id_pncp: str) -> dict[str, Any]:
-    """Pipeline Fase 2: parse + TenderSchema + checklist + triagem Art. 164 / Lei 14.133."""
-    pipeline = TenderPipeline()
+    """Pipeline: parse + TenderSchema + checklist + triagem Lei 14.133 (com RAG)."""
+    pipeline = TenderPipeline(use_rag=True)
     try:
         return await pipeline.run(id_pncp)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.post("/rag/index/lei-14133")
+async def index_lei_14133() -> dict[str, Any]:
+    """Indexa corpus Lei 14.133 + seed TCU (pgvector/JSONB ou memória)."""
+    store = get_legal_store()
+    count = await store.index_corpus()
+    return {
+        "indexed": count,
+        "backend": store.embedder.backend,
+        "sources": ["lei_14133", "tcu"],
+        "marco_legal": "Lei Federal nº 14.133/2021",
+    }
+
+
+@app.get("/rag/search")
+async def rag_search(q: str, top_k: int = 5) -> dict[str, Any]:
+    await ensure_legal_index()
+    hits = await retrieve_legal_context(q, top_k=top_k)
+    return {
+        "query": q,
+        "results": [
+            {
+                "chunk_id": h.chunk_id,
+                "source": h.source,
+                "titulo": h.titulo,
+                "fundamentacao": h.fundamentacao,
+                "score": h.score,
+                "texto": h.texto[:500],
+            }
+            for h in hits
+        ],
+    }
+
+
+@app.post("/agents/{id_pncp:path}/graph")
+async def run_graph(id_pncp: str) -> dict[str, Any]:
+    """LangGraph: ingestion → parser → extractor → legal_analyzer → matcher."""
+    try:
+        from src.agents.graph import run_tender_graph
+
+        return await run_tender_graph(id_pncp)
+    except ModuleNotFoundError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Dependência ausente para o grafo: {exc}. Instale requirements.txt (langgraph).",
+        ) from exc
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except FileNotFoundError as exc:

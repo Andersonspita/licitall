@@ -3,7 +3,7 @@
 > Fonte de verdade da fase atual para IAs e desenvolvedores. Atualizar a cada entrega significativa.
 
 **Última atualização:** 2026-08-24  
-**Fase atual:** 2 — Parsing Docling e schemas (Lei 14.133/2021) — núcleo implementado  
+**Fase atual:** 3 — LangGraph + RAG Lei 14.133/2021 (núcleo em andamento)  
 **Repositório:** https://github.com/Andersonspita/licitall  
 **Marco legal:** Lei Federal nº 14.133/2021 (nova lei) + LC 123/2006
 
@@ -12,29 +12,25 @@
 ## Checklist de fases
 
 ### Fase 1 — Fundação e ingestão
-- [x] `docker-compose.yml` (Postgres+pgvector, Redis, Minha Receita, Evolution API)
-- [x] Pacote `src/` + `requirements.txt` + settings
-- [x] Schemas Pydantic e tabela `TenderIngest`
-- [x] Client assíncrono PNCP + download em `data/raw/`
-- [x] API FastAPI + documentação + GitHub (só produto)
-- [ ] Validar `docker compose up` + sync PNCP real (smoke test local)
+- [x] Docker, `src/`, PNCP client, API, docs, GitHub
+- [ ] Smoke test local compose + sync PNCP
 - [ ] Deploy VPS — **adiado**
 
 ### Fase 2 — Parsing Docling e schemas
-- [x] Compliance Art. 164 (dias úteis) + LC 123 (`src/compliance/lei_14133.py`)
-- [x] Segmentação de seções alinhada à Lei 14.133 (`src/parser/sections.py`)
-- [x] Docling + fallback pypdfium2 + refs página/parágrafo
-- [x] Extração `TenderSchema` sem inventar exigências (`extractor` + `pipeline`)
-- [x] Checklist só com o que está no texto; triagem jurídica heurística
-- [x] Endpoints `POST /parser/{id}` e `POST /agents/{id}/extract`
-- [x] Testes `tests/test_lei_14133_fase2.py` (8 passed)
-- [x] Docs `docs/tecnica/FASE2_PARSING.md` e `COMPLIANCE_14133.md`
-- [ ] Rodar parse em PDF real baixado do PNCP (smoke com Docling instalado)
+- [x] Compliance Art. 164 + LC 123
+- [x] Docling/fallback, extractor, checklist, endpoints, testes, docs
+- [ ] Smoke parse em PDF real do PNCP
 
 ### Fase 3 — LangGraph + RAG jurídico
-- [ ] Implementar nós do grafo (esqueleto existe)
-- [ ] Base vetorial pgvector (texto Lei 14.133 + súmulas TCU)
-- [ ] Substituir/ enriquecer triagem heurística por RAG com citação
+- [x] Corpus Lei 14.133 + seed TCU em `data/legal/`
+- [x] `src/rag/` (embeddings, store, retriever)
+- [x] Triagem legal enriquecida com RAG
+- [x] Grafo LangGraph: ingestion → parser → extractor → legal → matcher
+- [x] Endpoints `/rag/index/lei-14133`, `/rag/search`, `/agents/{id}/graph`
+- [x] Docs `docs/tecnica/FASE3_RAG.md`
+- [ ] Expandir corpus com texto integral / mais acórdãos TCU
+- [ ] Checkpoint Postgres do LangGraph em produção
+- [ ] Matcher real (Fase 4)
 
 ### Fase 4 — Matchmaking Minha Receita
 - [ ] ETL/carga CNPJ + score CNAE/geo/porte (só ATIVAS)
@@ -46,6 +42,6 @@
 
 ## Próxima ação recomendada
 
-1. Smoke test local: baixar um edital PNCP → `POST /parser/...` → `POST /agents/.../extract`.  
-2. Iniciar **Fase 3**: indexar Lei 14.133 no pgvector e ligar os nós do LangGraph.  
-3. VPS permanece adiada.
+1. `POST /rag/index/lei-14133` e validar `GET /rag/search?q=artigo+164`.  
+2. Rodar `POST /agents/{id}/graph` após baixar um edital.  
+3. Expandir corpus TCU e ligar Fase 4 (matching).

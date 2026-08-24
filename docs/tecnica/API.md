@@ -45,6 +45,17 @@ Persiste metadados em `data/raw/{id}/_parsed/`.
 
 ## `POST /agents/{id_pncp}/extract`
 
-Pipeline Fase 2: parse + `TenderSchema` + checklist (só o que está no texto) + triagem Lei 14.133.  
-`limite_impugnacao` usa data do edital ou cálculo Art. 164 (3 dias úteis).
+Pipeline: parse + `TenderSchema` + checklist + triagem Lei 14.133 com RAG.
+
+## `POST /agents/{id_pncp}/graph`
+
+LangGraph: ingestion → parser → extractor → legal_analyzer → matcher (matcher ainda stub).
+
+## `POST /rag/index/lei-14133`
+
+Indexa corpus `data/legal/` (Lei 14.133 + seed TCU).
+
+## `GET /rag/search?q=...&top_k=5`
+
+Busca no índice jurídico.
 

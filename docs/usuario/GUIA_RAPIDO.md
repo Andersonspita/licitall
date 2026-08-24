@@ -19,9 +19,12 @@
 1. **Sincronizar** — `POST /ingestion/pncp/sync` (ex.: `{"uf":"SP","only_open":true}`)  
 2. **Baixar anexos** — `POST /ingestion/pncp/{numeroControlePNCP}/documents`  
 3. **Parsear** — `POST /parser/{numeroControlePNCP}`  
-4. **Extrair** — `POST /agents/{numeroControlePNCP}/extract`
+4. **Extrair** — `POST /agents/{numeroControlePNCP}/extract` (com RAG da Lei 14.133)  
+5. **Grafo completo (Fase 3)** — `POST /agents/{numeroControlePNCP}/graph`
 
-O resultado traz objeto, itens (PNCP), benefícios ME/EPP (se constarem no edital), checklist só com documentos citados e prazo de impugnação (edital ou Art. 164).
+Antes, uma vez: `POST /rag/index/lei-14133`.
+
+O resultado traz objeto, itens (PNCP), benefícios ME/EPP (se constarem no edital), checklist só com documentos citados, prazo de impugnação (edital ou Art. 164) e riscos com fundamentação na Lei 14.133/2021.
 
 ## Avisos importantes
 
