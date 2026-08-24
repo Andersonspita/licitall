@@ -14,7 +14,7 @@
 ### Fase 1 — Fundação e ingestão
 - [x] Docker, `src/`, PNCP client, API, docs, GitHub
 - [x] Smoke PNCP online (`scripts/smoke_local.py`)
-- [ ] Smoke Compose (Postgres/Redis/Evolution) — **Docker Desktop off neste ambiente**
+- [x] Smoke Compose parcial — Postgres/Redis/Evolution API (portas 5433/6380/8081)
 - [ ] Deploy VPS — **adiado**
 
 ### Fase 2 — Parsing Docling e schemas
@@ -38,15 +38,31 @@
 - [x] `POST /pipeline/{id_pncp}/run` — download → extract → match → kit → preview
 - [x] `scripts/smoke_compose.py` + `docs/usuario/OPERACAO_DOCKER.md`
 - [x] Testes `tests/test_fase6_pipeline.py`
-- [ ] Executar smoke Compose com Docker ligado
+- [x] Smoke Compose parcial (2026-08-24) — Postgres/Redis/Evolution API OK; Minha Receita off; pipeline 200
+
+---
+
+## Smoke Compose (2026-08-24)
+
+| Check | Resultado |
+|-------|-----------|
+| Postgres :5433 | OK |
+| Redis :6380 | OK |
+| Evolution API :8081 | OK |
+| Evolution Manager :3001 | Falha nginx na imagem |
+| Minha Receita :8001 | Off (atcr.io 401) |
+| `POST /pipeline/{id}/run` | OK — 4 minutas + Art. 164 |
+| PNCP sync Postgres | 429 rate limit (retentar) |
+
+Portas alternativas evitam conflito com containers `barbershop-*` em 5432/6379/8080.
 
 ---
 
 ## Próxima ação recomendada
 
-1. Ligar **Docker Desktop** → `docker compose up -d`  
-2. `uvicorn src.main:app --port 8000`  
-3. `python scripts/smoke_compose.py`  
-4. ETL Minha Receita + QR Evolution para matching/envio reais
+1. Minha Receita: `docker compose --profile full up -d` (ou build local do clone) + ETL  
+2. Evolution QR: corrigir/pinar imagem do Manager ou usar API em :8081  
+3. Retentar `POST /ingestion/pncp/sync` (PNCP pode retornar 429)  
+4. Conectar WhatsApp e testar envio real
 
 Script local (sem Docker): `scripts/smoke_local.py` · Doc: `docs/tecnica/SMOKE_LOCAL.md` · Fase 6: `docs/tecnica/FASE6_INTEGRACAO.md`

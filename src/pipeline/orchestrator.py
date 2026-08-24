@@ -60,7 +60,7 @@ async def run_full_pipeline(
     *,
     company: CompanyContext | None = None,
     download_if_missing: bool = True,
-    persist_kit: bool = True,
+    save_kit: bool = True,
     run_matching: bool = True,
     whatsapp_phone: str | None = None,
     send_whatsapp: bool = False,
@@ -99,7 +99,7 @@ async def run_full_pipeline(
 
     kit = build_document_kit(tender, company)
     kit_files: list[str] = []
-    if persist_kit:
+    if save_kit:
         try:
             kit_files = persist_kit(kit)
         except ValueError as exc:

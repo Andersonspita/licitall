@@ -1,12 +1,12 @@
 # LicitAll — serviços locais de infraestrutura
 # Uso: docker compose up -d
 #
-# Portas no host:
-#   5432  PostgreSQL 16 + pgvector (licitall / minhareceita / evolution)
-#   6379  Redis
-#   8001  Minha Receita (consulta CNPJ)
-#   8080  Evolution API (WhatsApp)
-#   3000  Evolution Manager (QR / instâncias)
+# Portas no host (ajuste via .env se houver conflito com outros projetos):
+#   ${LICITALL_POSTGRES_PORT:-5433}  PostgreSQL 16 + pgvector
+#   ${LICITALL_REDIS_PORT:-6380}      Redis
+#   8001                             Minha Receita (consulta CNPJ)
+#   ${LICITALL_EVOLUTION_PORT:-8081}  Evolution API (WhatsApp)
+#   ${LICITALL_EVOLUTION_UI_PORT:-3001} Evolution Manager (QR)
 #
 # A API FastAPI do LicitAll roda fora do Compose: uvicorn src.main:app --reload --port 8000
 
@@ -18,7 +18,7 @@ services:
     container_name: licitall-postgres
     restart: unless-stopped
     ports:
-      - "5432:5432"
+      - "${LICITALL_POSTGRES_PORT:-5433}:5432"
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-licitall}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-licitall}
@@ -41,7 +41,7 @@ services:
     restart: unless-stopped
     command: ["redis-server", "--appendonly", "yes"]
     ports:
-      - "6379:6379"
+      - "${LICITALL_REDIS_PORT:-6380}:6379"
     volumes:
       - licitall_redis:/data
     healthcheck:
@@ -53,6 +53,7 @@ services:
       - licitall
 
   minha-receita:
+    profiles: ["full"]
     image: atcr.io/cuducos.me/minha-receita:latest
     container_name: licitall-minha-receita
     restart: unless-stopped
@@ -80,11 +81,11 @@ services:
       redis:
         condition: service_healthy
     ports:
-      - "8080:8080"
+      - "${LICITALL_EVOLUTION_PORT:-8081}:8080"
     env_file:
       - ./docker/evolution.env
     environment:
-      SERVER_URL: ${EVOLUTION_SERVER_URL:-http://localhost:8080}
+      SERVER_URL: ${EVOLUTION_SERVER_URL:-http://localhost:8081}
       AUTHENTICATION_API_KEY: ${EVOLUTION_API_KEY:-licitall-dev-evolution-key}
       DATABASE_PROVIDER: postgresql
       DATABASE_CONNECTION_URI: postgresql://${POSTGRES_USER:-licitall}:${POSTGRES_PASSWORD:-licitall}@postgres:5432/evolution?schema=evolution_api
@@ -103,7 +104,7 @@ services:
     depends_on:
       - evolution-api
     ports:
-      - "3000:80"
+      - "${LICITALL_EVOLUTION_UI_PORT:-3001}:80"
     networks:
       - licitall
 

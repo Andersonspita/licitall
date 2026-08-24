@@ -107,7 +107,7 @@ class PipelineRunRequest(BaseModel):
     send_whatsapp: bool = False
 
 
-@app.post("/pipeline/{id_pncp}/run")
+@app.post("/pipeline/{id_pncp:path}/run")
 async def pipeline_run(id_pncp: str, body: PipelineRunRequest | None = None) -> dict[str, Any]:
     """Orquestra download → parse/extract → match → kit → preview WhatsApp."""
     body = body or PipelineRunRequest()
@@ -116,7 +116,7 @@ async def pipeline_run(id_pncp: str, body: PipelineRunRequest | None = None) -> 
             id_pncp,
             company=body.company,
             download_if_missing=body.download_if_missing,
-            persist_kit=body.persist_kit,
+            save_kit=body.persist_kit,
             run_matching=body.run_matching,
             whatsapp_phone=body.whatsapp_phone,
             send_whatsapp=body.send_whatsapp,

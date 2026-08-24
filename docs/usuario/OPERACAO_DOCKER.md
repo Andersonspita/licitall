@@ -20,11 +20,11 @@ Portas:
 
 | Serviço | URL |
 |---------|-----|
-| PostgreSQL | `localhost:5432` |
-| Redis | `localhost:6379` |
-| Minha Receita | http://localhost:8001 |
-| Evolution API | http://localhost:8080 |
-| Evolution Manager (QR) | http://localhost:3000 |
+| PostgreSQL | `localhost:5433` (padrão; evita conflito com 5432) |
+| Redis | `localhost:6380` |
+| Minha Receita | http://localhost:8001 (`docker compose --profile full up -d`) |
+| Evolution API | http://localhost:8081 |
+| Evolution Manager (QR) | http://localhost:3001 |
 
 ## 3. API FastAPI
 

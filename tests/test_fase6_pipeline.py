@@ -65,7 +65,7 @@ async def test_run_full_pipeline_with_existing_files(tmp_path, monkeypatch):
             id_pncp,
             company=CompanyContext(razao_social="Empresa Smoke LTDA", cnpj="12345678000199"),
             download_if_missing=False,
-            persist_kit=False,
+            save_kit=False,
             run_matching=True,
         )
 
