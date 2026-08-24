@@ -3,9 +3,9 @@
 > Fonte de verdade da fase atual para IAs e desenvolvedores. Atualizar a cada entrega significativa.
 
 **Última atualização:** 2026-08-24  
-**Fase atual:** 4 — Matchmaking Minha Receita (núcleo)  
+**Fase atual:** 5 — Peças e WhatsApp (núcleo)  
 **Repositório:** https://github.com/Andersonspita/licitall  
-**Marco legal:** Lei Federal nº 14.133/2021 + LC 123/2006
+**Marco legal:** Lei Federal nº 14.133/2021 + LC 123/2006 + disclaimer Lei 8.906/1994
 
 ---
 
@@ -25,21 +25,23 @@
 - [ ] Expandir corpus / checkpoint Postgres em produção
 
 ### Fase 4 — Matchmaking Minha Receita
-- [x] Mapa heurístico objeto → CNAE
-- [x] Score CNAE + UF/município + porte (só ATIVAS)
-- [x] `MatchmakingService` + respeito a exclusividade ME/EPP (LC 123)
-- [x] Nó `matcher` no LangGraph
-- [x] Endpoints `/matching/search` e `/matching/{id}`
-- [x] Testes `tests/test_fase4_matching.py`
-- [x] Docs `docs/tecnica/FASE4_MATCHING.md`
+- [x] Score CNAE/geo/porte, API, LangGraph matcher, docs/testes
 - [ ] Validar contra base Minha Receita populada (ETL)
 
 ### Fase 5 — Peças e WhatsApp
-- [ ] Minutas + disclaimer OAB + Evolution
+- [x] Kit de minutas (proposta, esclarecimento, impugnação, declarações) + disclaimer OAB
+- [x] Impugnação só com riscos detectados (anti-alucinação)
+- [x] Persistência em `data/raw/{id}/_kit/`
+- [x] Outreach Evolution (preview + send)
+- [x] Endpoints `/advisory/*` e `/outreach/whatsapp/*`
+- [x] Testes `tests/test_fase5_advisory.py`
+- [x] Docs `docs/tecnica/FASE5_ADVISORY.md`
+- [ ] Validar envio real com instância Evolution conectada (QR)
 
 ---
 
 ## Próxima ação recomendada
 
-1. Popular Minha Receita (ETL) e testar `POST /matching/{id}`.  
-2. Iniciar **Fase 5**: gerador de minutas (Art. 164) + Evolution WhatsApp.
+1. Smoke ponta a ponta local (compose + um edital PNCP + kit + preview WhatsApp).  
+2. Conectar Evolution (QR) e testar `POST /outreach/whatsapp/opportunity`.  
+3. Ciclo de polish: corpus TCU, ETL Minha Receita, export PDF das minutas.

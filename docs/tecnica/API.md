@@ -68,3 +68,19 @@ Retorna empresas ATIVAS ranqueadas (Minha Receita).
 
 Extrai o edital e executa o matchmaking (CNAE + UF + porte / LC 123).
 
+## `POST /advisory/generate`
+
+Gera kit de minutas a partir de `tender` (+ `company` opcional). Inclui disclaimer Lei 8.906/1994.
+
+## `POST /advisory/{id_pncp}/kit`
+
+Extrai o edital e gera/persiste o kit em `data/raw/.../_kit/`.
+
+## `POST /outreach/whatsapp/preview`
+
+Monta mensagem de oportunidade sem enviar.
+
+## `POST /outreach/whatsapp/opportunity`
+
+Envia via Evolution API (`EVOLUTION_API_URL` / `EVOLUTION_API_KEY` / `EVOLUTION_INSTANCE`).
+

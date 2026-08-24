@@ -21,11 +21,13 @@
 3. **Parsear** — `POST /parser/{numeroControlePNCP}`  
 4. **Extrair** — `POST /agents/{numeroControlePNCP}/extract` (com RAG da Lei 14.133)  
 5. **Grafo completo** — `POST /agents/{numeroControlePNCP}/graph`  
-6. **Match de empresas** — `POST /matching/{numeroControlePNCP}` (requer Minha Receita com base carregada)
+6. **Match de empresas** — `POST /matching/{numeroControlePNCP}` (requer Minha Receita com base carregada)  
+7. **Kit de minutas** — `POST /advisory/{numeroControlePNCP}/kit`  
+8. **WhatsApp (preview)** — `POST /outreach/whatsapp/preview`
 
 Antes, uma vez: `POST /rag/index/lei-14133`.
 
-O resultado traz objeto, itens (PNCP), benefícios ME/EPP (se constarem no edital), checklist só com documentos citados, prazo de impugnação (edital ou Art. 164), riscos com fundamentação na Lei 14.133/2021 e, na Fase 4, empresas ATIVAS compatíveis por CNAE/UF/porte.
+O resultado traz objeto, itens, checklist, riscos (Lei 14.133), matches e minutas com **disclaimer OAB** (Lei 8.906/1994). Impugnação só usa vícios detectados no edital.
 
 ## Avisos importantes
 

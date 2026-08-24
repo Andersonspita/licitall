@@ -18,6 +18,8 @@ from src.ingestion.service import download_tender_documents, ingest_publicacoes
 from src.ingestion.storage import DocumentStorage
 from src.models.enums import DEFAULT_INGESTION_MODALITIES, ModalityEnum
 from src.matching.service import MatchmakingService
+from src.advisory import CompanyContext, build_document_kit, persist_kit
+from src.outreach import OutreachPayload, OutreachService
 from src.parser.service import ParserService
 from src.rag.corpus import load_legal_corpus
 from src.rag.retriever import ensure_legal_index, get_legal_store, retrieve_legal_context
@@ -78,12 +80,13 @@ async def health() -> dict[str, Any]:
         "status": "ok",
         "version": __version__,
         "marco_legal": "Lei Federal nº 14.133/2021",
-        "fase": "4-matching",
+        "fase": "5-advisory-outreach",
         "docling_available": parser.docling_available,
         "legal_chunks": len(load_legal_corpus()),
         "raw_docs_dir": str(settings.raw_docs_path),
         "minha_receita": settings.minha_receita_base_url,
         "evolution_api": settings.evolution_api_url,
+        "evolution_instance": settings.evolution_instance,
     }
 
 
@@ -292,6 +295,91 @@ async def matching_for_tender(
         payload = result.model_dump(mode="json")
         payload["extraction_sections"] = extracted.get("extraction", {}).get("sections_found")
         return payload
+    finally:
+        await service.aclose()
+
+
+class AdvisoryRequest(BaseModel):
+    tender: dict[str, Any] | None = None
+    company: CompanyContext | None = None
+    perguntas_esclarecimento: list[str] | None = None
+    persist: bool = True
+
+
+@app.post("/advisory/generate")
+async def advisory_generate(body: AdvisoryRequest) -> dict[str, Any]:
+    """Gera kit de minutas (proposta, esclarecimento, impugnação, declarações) com disclaimer OAB."""
+    if not body.tender:
+        raise HTTPException(status_code=422, detail="Campo tender é obrigatório.")
+    kit = build_document_kit(
+        body.tender,
+        body.company,
+        perguntas_esclarecimento=body.perguntas_esclarecimento,
+    )
+    saved: list[str] = []
+    if body.persist:
+        try:
+            saved = persist_kit(kit)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return {**kit.model_dump(mode="json"), "saved_files": saved}
+
+
+class KitFromTenderRequest(BaseModel):
+    company: CompanyContext | None = None
+    persist: bool = True
+
+
+@app.post("/advisory/{id_pncp:path}/kit")
+async def advisory_kit_for_tender(
+    id_pncp: str,
+    body: KitFromTenderRequest | None = None,
+) -> dict[str, Any]:
+    """Extrai edital e gera o kit de participação (minutas Lei 14.133 + disclaimer)."""
+    body = body or KitFromTenderRequest()
+    pipeline = TenderPipeline(use_rag=True)
+    try:
+        extracted = await pipeline.run(id_pncp)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    tender = (extracted.get("extraction") or {}).get("tender") or {}
+    tender["id_pncp"] = id_pncp
+    kit = build_document_kit(tender, body.company)
+    saved: list[str] = []
+    if body.persist:
+        saved = persist_kit(kit)
+    return {
+        **kit.model_dump(mode="json"),
+        "saved_files": saved,
+        "riscos_count": len(tender.get("riscos_juridicos") or []),
+    }
+
+
+@app.post("/outreach/whatsapp/opportunity")
+async def outreach_whatsapp(body: OutreachPayload) -> dict[str, Any]:
+    """Dispara alerta WhatsApp via Evolution API (instância configurada)."""
+    service = OutreachService()
+    try:
+        return await service.notify_opportunity(body)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Falha ao enviar via Evolution API: {exc}",
+        ) from exc
+    finally:
+        await service.aclose()
+
+
+@app.post("/outreach/whatsapp/preview")
+async def outreach_preview(body: OutreachPayload) -> dict[str, Any]:
+    """Monta a mensagem sem enviar (útil para validação)."""
+    service = OutreachService()
+    try:
+        text = service.build_message(body)
+        return {"preview": text, "chars": len(text)}
     finally:
         await service.aclose()
 

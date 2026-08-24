@@ -27,14 +27,14 @@ Somente em `src/` (ou `app/`). Stack: Python 3.11+, FastAPI, Pydantic v2, SQLMod
 4. Matchmaking Minha Receita  
 5. Peças + Evolution WhatsApp  
 
-Estado oficial: `docs/fase/STATUS.md`.
+Estado oficial: `docs/fase/STATUS.md` (Fase 5 núcleo entregue).
 
 ## Compliance (não negociável)
 
 - **Marco:** Lei Federal nº 14.133/2021. Não usar Lei 8.666 como base do motor.
 - LC 123/2006 para ME/EPP (exclusividade / cota 25%).
-- Nunca inventar certidões/prazos/empresas ausentes das fontes.
-- Rodapé OAB (Lei 8.906/1994) em toda minuta.
+- Nunca inventar certidões/prazos/empresas/vícios ausentes das fontes.
+- Rodapé OAB (Lei 8.906/1994) em toda minuta (`DISCLAIMER_OAB`).
 - Impugnação: 3 dias **úteis** antes da abertura (Art. 164).
 - Detalhes: `docs/tecnica/COMPLIANCE_14133.md`.
 
@@ -56,6 +56,6 @@ uvicorn src.main:app --reload --port 8000
 pytest tests/ -q
 ```
 
-Fluxo: sync → documents → parser → `rag/index` → extract ou graph → `matching/{id}`.
+Fluxo: sync → documents → parser → `rag/index` → extract/graph → matching → `advisory/kit` → WhatsApp preview/send.
 
-Docs de fase: `FASE2_PARSING.md`, `FASE3_RAG.md`, `FASE4_MATCHING.md`.
+Docs de fase: `FASE2_PARSING.md`, `FASE3_RAG.md`, `FASE4_MATCHING.md`, `FASE5_ADVISORY.md`.

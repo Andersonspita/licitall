@@ -4,9 +4,9 @@ Plataforma B2G de automação do ciclo de vendas públicas: mineração PNCP →
 
 ## Status atual
 
-**Fase 4 — Matchmaking Minha Receita** (núcleo), marco **Lei 14.133/2021** + LC 123/2006.
+**Fase 5 — Peças e WhatsApp** (núcleo). Marco: **Lei 14.133/2021** + disclaimer **Lei 8.906/1994**.
 
-Detalhes: [STATUS](docs/fase/STATUS.md) · [Compliance](docs/tecnica/COMPLIANCE_14133.md) · [Fase 3](docs/tecnica/FASE3_RAG.md) · [Fase 4](docs/tecnica/FASE4_MATCHING.md) · [Usuário](docs/usuario/GUIA_RAPIDO.md) · [AGENTS](AGENTS.md)
+Detalhes: [STATUS](docs/fase/STATUS.md) · [Fase 5](docs/tecnica/FASE5_ADVISORY.md) · [Compliance](docs/tecnica/COMPLIANCE_14133.md) · [Usuário](docs/usuario/GUIA_RAPIDO.md) · [AGENTS](AGENTS.md)
 
 
 ## O que entra neste repositório
@@ -41,6 +41,8 @@ uvicorn src.main:app --reload --port 8000
 - `POST /agents/{id_pncp}/graph` — LangGraph completo (inclui matches)
 - `POST /rag/index/lei-14133` / `GET /rag/search` — base jurídica
 - `POST /matching/search` / `POST /matching/{id_pncp}` — empresas ATIVAS (CNAE/geo/porte)
+- `POST /advisory/generate` / `POST /advisory/{id}/kit` — minutas + disclaimer OAB
+- `POST /outreach/whatsapp/preview` / `opportunity` — alerta Evolution
 
 ## Deploy na VPS
 
