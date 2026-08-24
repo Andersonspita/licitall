@@ -124,17 +124,23 @@ _______________________________
     return render_minuta("esclarecimento", tender, body)
 
 
+def _action_value(action: LegalAction | str) -> str:
+    if isinstance(action, LegalAction):
+        return action.value
+    return str(getattr(action, "value", action)).upper()
+
+
 def draft_impugnacao(
     tender: TenderSchema,
     company: CompanyContext,
     riscos: list[LegalRiskItem] | None = None,
 ) -> str:
     risks = riscos if riscos is not None else list(tender.riscos_juridicos)
-    actionable = [
-        r
-        for r in risks
-        if str(r.sugestao_acao) in {LegalAction.IMPUGNACAO.value, LegalAction.PEDIDO_ESCLARECIMENTO.value, "IMPUGNACAO", "PEDIDO_ESCLARECIMENTO"}
-    ]
+    allowed = {
+        LegalAction.IMPUGNACAO.value,
+        LegalAction.PEDIDO_ESCLARECIMENTO.value,
+    }
+    actionable = [r for r in risks if _action_value(r.sugestao_acao) in allowed]
     avisos = []
     if not actionable:
         avisos.append(
