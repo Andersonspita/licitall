@@ -42,10 +42,11 @@ python scripts/smoke_compose.py --api http://127.0.0.1:8000
 - `POST /agents/{id_pncp}/extract` — `TenderSchema` + checklist + Art. 164 + RAG
 - `POST /agents/{id_pncp}/graph` — LangGraph completo (inclui matches)
 - `POST /rag/index/lei-14133` / `GET /rag/search` — base jurídica
-- `POST /matching/search` / `POST /matching/{id_pncp}` — empresas ATIVAS (CNAE/geo/porte)
+- `POST /matching/search` / `POST /matching/{id_pncp}` — empresas ATIVAS (score explicável BID/REVIEW/SKIP)
+- `POST /matching/company` — match inverso CNPJ → oportunidades
 - `POST /advisory/generate` / `POST /advisory/{id}/kit` — minutas + disclaimer OAB
 - `POST /outreach/whatsapp/preview` / `opportunity` — alerta Evolution
-
+- `POST /outreach/whatsapp/digest` / `digest/from-company` — digest top-N
 ## Deploy na VPS
 
 Adiado. Guia: [docs/tecnica/DEPLOY_VPS.md](docs/tecnica/DEPLOY_VPS.md).

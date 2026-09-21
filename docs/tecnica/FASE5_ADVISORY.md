@@ -23,9 +23,37 @@ Persistência: `data/raw/{slug}/_kit/`.
 
 - `POST /advisory/generate` — kit a partir de `tender` JSON  
 - `POST /advisory/{id_pncp}/kit` — extrai + gera kit  
-- `POST /outreach/whatsapp/preview` — monta mensagem sem enviar  
-- `POST /outreach/whatsapp/opportunity` — envia via Evolution API  
+- `POST /outreach/whatsapp/preview` — monta mensagem de 1 oportunidade sem enviar  
+- `POST /outreach/whatsapp/opportunity` — envia 1 oportunidade via Evolution API  
+- `POST /outreach/whatsapp/digest/preview` — monta digest top-N sem enviar  
+- `POST /outreach/whatsapp/digest` — envia digest top-N  
+- `POST /outreach/whatsapp/digest/from-company` — match inverso + digest (preview ou `send: true`)
 
+### Digest (top-N)
+
+Body exemplo:
+
+```json
+{
+  "phone": "5511999999999",
+  "company_name": "LIMPEZA ME LTDA",
+  "cnpj": "12345678000199",
+  "top_n": 5,
+  "opportunities": [
+    {
+      "id_pncp": "00000000000000-1-000001/2026",
+      "orgao": "PREFEITURA X",
+      "objeto": "Serviços de limpeza",
+      "valor_total": 45000,
+      "score": 88,
+      "recommendation": "BID",
+      "uf": "SP"
+    }
+  ]
+}
+```
+
+A mensagem lista BID/REVIEW, score e PNCP, com rodapé Lei 14.133 + Lei 8.906.
 ## Evolution
 
 Config: `EVOLUTION_API_URL`, `EVOLUTION_API_KEY`, `EVOLUTION_INSTANCE` no `.env`.  

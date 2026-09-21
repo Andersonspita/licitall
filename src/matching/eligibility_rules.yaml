@@ -1,0 +1,28 @@
+# Regras declarativas de elegibilidade (inspiração BidPilot).
+# severity: hard = desclassifica / força SKIP; soft = aviso no resultado.
+version: 1
+marco_legal: "Lei Federal nº 14.133/2021 c/c Lei Complementar nº 123/2006"
+thresholds:
+  bid: 70
+  review: 40
+rules:
+  - id: empresa_ativa
+    severity: hard
+    description: "Somente empresas com situação cadastral ATIVA na Receita Federal."
+  - id: lote_exclusivo_me_epp
+    severity: hard
+    description: "Lote/item exclusivo ME/EPP (LC 123/2006 Art. 48) exige porte ME ou EPP."
+  - id: proximidade_obrigatoria
+    severity: hard
+    description: "Quando require_proximity=true, a empresa deve estar na mesma UF do órgão."
+  - id: prazo_propostas_aberto
+    severity: soft
+    description: "Preferir oportunidades com prazo de recebimento de propostas ainda aberto."
+  - id: art_164_janela
+    severity: soft
+    description: "Janela de impugnação/esclarecimento — Art. 164 (3 dias úteis antes da abertura)."
+  - id: lead_minimo_dias
+    severity: soft
+    params:
+      min_calendar_days: 2
+    description: "Alerta se restam menos de N dias corridos até abertura ou encerramento."

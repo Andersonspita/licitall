@@ -49,7 +49,7 @@ Pipeline: parse + `TenderSchema` + checklist + triagem Lei 14.133 com RAG.
 
 ## `POST /agents/{id_pncp}/graph`
 
-LangGraph: ingestion → parser → extractor → legal_analyzer → matcher (matcher ainda stub).
+LangGraph: ingestion → parser → extractor → legal_analyzer → matcher (score explicável + elegibilidade).
 
 ## `POST /rag/index/lei-14133`
 
@@ -62,11 +62,16 @@ Busca no índice jurídico.
 ## `POST /matching/search`
 
 Body: `{ "tender": { ...TenderSchema-like }, "limit": 30, "min_score": 40, "require_proximity": false }`.  
-Retorna empresas ATIVAS ranqueadas (Minha Receita).
+Retorna empresas ATIVAS ranqueadas com score explicável, `recommendation` (BID/REVIEW/SKIP) e elegibilidade YAML.
+
+## `POST /matching/company`
+
+Match inverso CNPJ → oportunidades. Body: `{ "cnpj", "tenders"?, "limit", "min_score", "require_proximity", "uf" }`.  
+Sem `tenders`, lê `tender_ingest` (Postgres). Ver [FASE4_MATCHING.md](FASE4_MATCHING.md).
 
 ## `POST /matching/{id_pncp}`
 
-Extrai o edital e executa o matchmaking (CNAE + UF + porte / LC 123).
+Extrai o edital e executa o matchmaking (CNAE + geo + porte / LC 123 + prazo/Art. 164).
 
 ## `POST /advisory/generate`
 
@@ -83,4 +88,12 @@ Monta mensagem de oportunidade sem enviar.
 ## `POST /outreach/whatsapp/opportunity`
 
 Envia via Evolution API (`EVOLUTION_API_URL` / `EVOLUTION_API_KEY` / `EVOLUTION_INSTANCE`).
+
+## `POST /outreach/whatsapp/digest/preview` · `POST /outreach/whatsapp/digest`
+
+Digest top-N oportunidades (score + BID/REVIEW/SKIP).
+
+## `POST /outreach/whatsapp/digest/from-company`
+
+Match inverso + digest (`send: false` = só preview).
 

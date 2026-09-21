@@ -72,3 +72,44 @@ def test_outreach_preview_mentions_lei():
     assert "14.133" in text
     assert "8.906" in text
     assert "ORGAO X" in text
+
+
+def test_digest_preview_lists_top_opportunities():
+    from src.outreach.service import DigestItem, DigestPayload
+
+    service = OutreachService()
+    text = service.build_digest_message(
+        DigestPayload(
+            phone="5511999999999",
+            company_name="LIMPEZA ME LTDA",
+            cnpj="12345678000199",
+            top_n=2,
+            opportunities=[
+                DigestItem(
+                    id_pncp="00000000000000-1-000001/2026",
+                    orgao="PREFEITURA A",
+                    objeto="Limpeza predial completa do complexo administrativo municipal",
+                    valor_total=45000,
+                    score=88,
+                    recommendation="BID",
+                    uf="SP",
+                ),
+                DigestItem(
+                    id_pncp="00000000000000-1-000002/2026",
+                    orgao="ORGAO B",
+                    objeto="Serviços de conservação",
+                    valor_total=20000,
+                    score=55,
+                    recommendation="REVIEW",
+                    uf="SP",
+                ),
+            ],
+        )
+    )
+    assert "digest" in text.lower()
+    assert "BID" in text
+    assert "REVIEW" in text
+    assert "14.133" in text
+    assert "8.906" in text
+    assert "LIMPEZA ME LTDA" in text
+    assert "00000000000000-1-000001/2026" in text

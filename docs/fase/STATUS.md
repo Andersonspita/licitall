@@ -2,7 +2,7 @@
 
 > Fonte de verdade da fase atual para IAs e desenvolvedores. Atualizar a cada entrega significativa.
 
-**Última atualização:** 2026-08-24  
+**Última atualização:** 2026-09-21  
 **Fase atual:** 6 — integração operacional (pipeline + health deps + smoke Compose)  
 **Repositório:** https://github.com/Andersonspita/licitall  
 **Marco legal:** Lei Federal nº 14.133/2021 + LC 123/2006 + disclaimer Lei 8.906/1994
@@ -27,10 +27,14 @@
 
 ### Fase 4 — Matchmaking Minha Receita
 - [x] Score CNAE/geo/porte, API, LangGraph matcher, docs/testes
+- [x] Score explicável 5 fatores + BID/REVIEW/SKIP
+- [x] Elegibilidade declarativa YAML (Art. 164 / LC 123 / ATIVA)
+- [x] Match inverso `POST /matching/company` (CNPJ → oportunidades)
 - [ ] Validar contra base Minha Receita populada (ETL)
 
 ### Fase 5 — Peças e WhatsApp
 - [x] Kit de minutas + disclaimer OAB + Evolution preview/send APIs
+- [x] Digest WhatsApp top-N (`/outreach/whatsapp/digest` + `from-company`)
 - [ ] Envio real WhatsApp (Evolution + QR)
 
 ### Fase 6 — Integração operacional
@@ -58,11 +62,24 @@ Portas alternativas evitam conflito com containers `barbershop-*` em 5432/6379/8
 
 ---
 
+## Entrega 2026-09-21 — matching + digest
+
+Inspirado em cases (BidPilot / Bandifinder / Licinexus), **sem** robô de lances, chat de pregão ou CRM:
+
+1. Score explicável (CNAE 35 + geo 20 + porte 15 + econômico 15 + prazo 15)  
+2. `src/matching/eligibility_rules.yaml` + motor hard/soft  
+3. Match inverso empresa → editais  
+4. Digest WhatsApp top-N  
+
+Docs: `FASE4_MATCHING.md`, `FASE5_ADVISORY.md`, `API.md`.
+
+---
+
 ## Próxima ação recomendada
 
 1. Minha Receita: `docker compose --profile full up -d` (ou build local do clone) + ETL  
 2. Evolution QR: corrigir/pinar imagem do Manager ou usar API em :8081  
 3. Retentar `POST /ingestion/pncp/sync` (PNCP pode retornar 429)  
-4. Conectar WhatsApp e testar envio real
+4. Conectar WhatsApp e testar digest real (`/outreach/whatsapp/digest/from-company` com `send: true`)
 
 Script local (sem Docker): `scripts/smoke_local.py` · Doc: `docs/tecnica/SMOKE_LOCAL.md` · Fase 6: `docs/tecnica/FASE6_INTEGRACAO.md`

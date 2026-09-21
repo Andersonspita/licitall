@@ -19,7 +19,7 @@ from src.ingestion.storage import DocumentStorage
 from src.models.enums import DEFAULT_INGESTION_MODALITIES, ModalityEnum
 from src.matching.service import MatchmakingService
 from src.advisory import CompanyContext, build_document_kit, persist_kit
-from src.outreach import OutreachPayload, OutreachService
+from src.outreach import DigestItem, DigestPayload, OutreachPayload, OutreachService
 from src.parser.service import ParserService
 from src.infra.health import check_dependencies
 from src.pipeline.orchestrator import run_full_pipeline
@@ -289,6 +289,33 @@ class MatchRequest(BaseModel):
     require_proximity: bool = False
 
 
+class CompanyMatchRequest(BaseModel):
+    """Match inverso: CNPJ → oportunidades (lista inline ou tender_ingest)."""
+
+    cnpj: str
+    tenders: list[dict[str, Any]] | None = None
+    limit: int = Field(default=20, ge=1, le=100)
+    min_score: float = Field(default=40.0, ge=0, le=100)
+    require_proximity: bool = False
+    uf: str | None = None
+    company: dict[str, Any] | None = None
+
+
+class DigestFromCompanyRequest(BaseModel):
+    """Monta (e opcionalmente envia) digest WhatsApp a partir do match inverso."""
+
+    phone: str
+    cnpj: str
+    tenders: list[dict[str, Any]] | None = None
+    top_n: int = Field(default=5, ge=1, le=15)
+    min_score: float = Field(default=40.0, ge=0, le=100)
+    require_proximity: bool = False
+    uf: str | None = None
+    company: dict[str, Any] | None = None
+    send: bool = False
+    instance: str | None = None
+
+
 @app.post("/matching/search")
 async def matching_search(body: MatchRequest) -> dict[str, Any]:
     service = MatchmakingService()
@@ -298,6 +325,29 @@ async def matching_search(body: MatchRequest) -> dict[str, Any]:
             limit=body.limit,
             min_score=body.min_score,
             require_proximity=body.require_proximity,
+        )
+        return result.model_dump(mode="json")
+    finally:
+        await service.aclose()
+
+
+@app.post("/matching/company")
+async def matching_for_company(
+    body: CompanyMatchRequest,
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, Any]:
+    """Match inverso: empresa ATIVA (CNPJ) → editais ranqueados com BID/REVIEW/SKIP."""
+    service = MatchmakingService()
+    try:
+        result = await service.match_company(
+            body.cnpj,
+            tenders=body.tenders,
+            session=None if body.tenders is not None else session,
+            limit=body.limit,
+            min_score=body.min_score,
+            require_proximity=body.require_proximity,
+            uf_filter=body.uf,
+            company=body.company,
         )
         return result.model_dump(mode="json")
     finally:
@@ -418,6 +468,94 @@ async def outreach_preview(body: OutreachPayload) -> dict[str, Any]:
         return {"preview": text, "chars": len(text)}
     finally:
         await service.aclose()
+
+
+@app.post("/outreach/whatsapp/digest/preview")
+async def outreach_digest_preview(body: DigestPayload) -> dict[str, Any]:
+    """Monta digest top-N sem enviar."""
+    service = OutreachService()
+    try:
+        text = service.build_digest_message(body)
+        return {"preview": text, "chars": len(text), "items": min(len(body.opportunities), body.top_n)}
+    finally:
+        await service.aclose()
+
+
+@app.post("/outreach/whatsapp/digest")
+async def outreach_digest(body: DigestPayload) -> dict[str, Any]:
+    """Envia digest WhatsApp (top-N oportunidades) via Evolution API."""
+    service = OutreachService()
+    try:
+        return await service.notify_digest(body)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Falha ao enviar digest via Evolution API: {exc}",
+        ) from exc
+    finally:
+        await service.aclose()
+
+
+@app.post("/outreach/whatsapp/digest/from-company")
+async def outreach_digest_from_company(
+    body: DigestFromCompanyRequest,
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, Any]:
+    """Match inverso + digest WhatsApp (preview ou envio)."""
+    matcher = MatchmakingService()
+    outreach = OutreachService()
+    try:
+        result = await matcher.match_company(
+            body.cnpj,
+            tenders=body.tenders,
+            session=None if body.tenders is not None else session,
+            limit=body.top_n,
+            min_score=body.min_score,
+            require_proximity=body.require_proximity,
+            uf_filter=body.uf,
+            company=body.company,
+        )
+        digest = DigestPayload(
+            phone=body.phone,
+            company_name=result.razao_social or body.cnpj,
+            cnpj=result.cnpj,
+            top_n=body.top_n,
+            instance=body.instance,
+            opportunities=[
+                DigestItem(
+                    id_pncp=op.id_pncp,
+                    orgao=op.orgao_comprador,
+                    objeto=op.objeto_resumido,
+                    valor_total=op.valor_total_estimado,
+                    score=op.score,
+                    recommendation=op.recommendation,
+                    uf=op.uf,
+                )
+                for op in result.opportunities
+            ],
+        )
+        preview = outreach.build_digest_message(digest)
+        payload: dict[str, Any] = {
+            "matching": result.model_dump(mode="json"),
+            "preview": preview,
+            "chars": len(preview),
+            "sent": False,
+        }
+        if body.send:
+            sent = await outreach.notify_digest(digest)
+            payload["sent"] = True
+            payload["evolution"] = sent.get("evolution")
+        return payload
+    except Exception as exc:
+        if body.send:
+            raise HTTPException(
+                status_code=502,
+                detail=f"Falha no digest from-company: {exc}",
+            ) from exc
+        raise
+    finally:
+        await matcher.aclose()
+        await outreach.aclose()
 
 
 if __name__ == "__main__":
