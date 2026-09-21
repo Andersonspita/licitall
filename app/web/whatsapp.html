@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LicitAll — Disparos WhatsApp</title>
+  <link rel="icon" href="/ui/assets/logo.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet">
+  <link href="/ui/assets/app.css" rel="stylesheet">
+  <script src="/ui/assets/tailwind-theme.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwind.config = window.__LICITALL_TW__;</script>
+  <script src="/ui/assets/auth.js"></script>
+  <script src="/ui/assets/api.js"></script>
+  <script src="/ui/assets/shell.js"></script>
+</head>
+<body class="bg-background font-body-md text-body-md text-on-surface">
+<div id="app-root">
+<div data-page class="flex flex-col w-full gap-space-lg max-w-5xl">
+  <div class="bg-surface-container-lowest p-space-lg rounded shadow-sm flex items-start gap-3">
+    <span class="material-symbols-outlined text-on-tertiary-container text-[32px]">chat</span>
+    <div>
+      <h1 class="font-headline-lg text-headline-lg tracking-tight">Disparos WhatsApp</h1>
+      <p class="font-body-sm text-on-surface-variant mt-1">Preview de digest via Evolution API — sem envio até confirmar instância.</p>
+      <span class="inline-flex mt-2 px-2 py-0.5 rounded bg-surface-container font-data-mono text-[11px] font-bold">POST /outreach/whatsapp/digest/preview</span>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-space-lg">
+    <form id="digest-form" class="bg-surface-container-lowest p-space-lg rounded shadow-sm flex flex-col gap-space-md">
+      <label class="flex flex-col gap-1.5">
+        <span class="font-label-sm font-semibold text-on-surface-variant">Telefone (DDI)</span>
+        <input id="phone" type="text" required value="" placeholder="5511999999999"
+          class="rounded bg-surface-container-low px-3 py-2 font-data-mono text-body-sm focus:outline-none focus:ring-2 focus:ring-secondary">
+      </label>
+      <label class="flex flex-col gap-1.5">
+        <span class="font-label-sm font-semibold text-on-surface-variant">Nome da empresa</span>
+        <input id="company_name" type="text" required value="" placeholder="Razão social"
+          class="rounded bg-surface-container-low px-3 py-2 font-body-sm focus:outline-none focus:ring-2 focus:ring-secondary">
+      </label>
+      <label class="flex flex-col gap-1.5">
+        <span class="font-label-sm font-semibold text-on-surface-variant">CNPJ (opcional)</span>
+        <input id="cnpj" type="text" value="" placeholder="00.000.000/0001-00"
+          class="rounded bg-surface-container-low px-3 py-2 font-data-mono text-body-sm focus:outline-none focus:ring-2 focus:ring-secondary">
+      </label>
+      <label class="flex flex-col gap-1.5">
+        <span class="font-label-sm font-semibold text-on-surface-variant">Top N oportunidades</span>
+        <input id="top_n" type="number" value="5" min="1" max="15"
+          class="rounded bg-surface-container-low px-3 py-2 font-body-sm focus:outline-none focus:ring-2 focus:ring-secondary">
+      </label>
+      <label class="flex flex-col gap-1.5">
+        <span class="font-label-sm font-semibold text-on-surface-variant">Oportunidades (JSON — preenchido com editais reais)</span>
+        <textarea id="opportunities" rows="6" class="rounded bg-surface-container-low px-3 py-2 font-data-mono text-[10px] focus:outline-none focus:ring-2 focus:ring-secondary">[]</textarea>
+      </label>
+      <button type="submit" class="flex items-center justify-center gap-2 py-2.5 rounded bg-secondary text-on-secondary font-label-md font-semibold shadow-sm">
+        <span class="material-symbols-outlined text-[18px]">preview</span>Gerar preview digest
+      </button>
+    </form>
+
+    <div class="flex flex-col gap-space-md">
+      <div class="bg-surface-container-lowest rounded shadow-sm p-space-md flex-1 flex flex-col">
+        <div class="flex items-center gap-2 mb-3">
+          <span class="material-symbols-outlined text-secondary text-[22px]">smartphone</span>
+          <h2 class="font-headline-sm font-bold">Preview da mensagem</h2>
+        </div>
+        <div id="preview-box" class="flex-1 p-space-md rounded bg-surface-container-low font-body-sm whitespace-pre-wrap text-on-surface min-h-[280px]">
+          <span class="text-outline italic">Clique em "Gerar preview digest" para montar a mensagem.</span>
+        </div>
+        <div id="preview-meta" class="mt-2 font-data-mono text-[10px] text-outline"></div>
+      </div>
+      <div class="p-space-md rounded bg-surface-container flex items-start gap-2">
+        <span class="material-symbols-outlined text-secondary text-[18px]">verified_user</span>
+        <p class="font-label-sm text-[11px] text-on-surface-variant leading-relaxed">
+          Mensagens incluem aviso Lei 8.906/1994 (OAB). Minutas citadas exigem revisão humana. Marco: Lei 14.133/2021.
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+<script>
+  LicitAllShell.mount({
+    active: "disparos-whatsapp",
+    async onReady() {
+      try {
+        const params = new URLSearchParams(location.search);
+        const focusId = params.get("id");
+        const list = await LicitAllApi.listTenders({ limit: 10 });
+        let items = list.items || [];
+        if (focusId) {
+          const hit = items.find((t) => t.id_pncp === focusId);
+          if (!hit) {
+            try { items = [await LicitAllApi.getTender(focusId), ...items]; } catch { /* ignore */ }
+          } else {
+            items = [hit, ...items.filter((t) => t.id_pncp !== focusId)];
+          }
+        }
+        const ops = items.slice(0, 5).map((t) => ({
+          id_pncp: t.id_pncp,
+          orgao: t.orgao_comprador,
+          objeto: (t.objeto_resumido || "").slice(0, 120),
+          valor_total: t.valor_total_estimado,
+          uf: t.uf,
+          recommendation: "REVIEW",
+          score: null,
+        }));
+        document.getElementById("opportunities").value = JSON.stringify(ops, null, 2);
+      } catch (err) {
+        document.getElementById("opportunities").value = "[]";
+        document.getElementById("preview-meta").textContent = "Não foi possível carregar editais: " + err.message;
+      }
+
+      document.getElementById("digest-form").addEventListener("submit", async (ev) => {
+        ev.preventDefault();
+        let opportunities;
+        try {
+          opportunities = JSON.parse(document.getElementById("opportunities").value);
+        } catch {
+          alert("JSON de oportunidades inválido");
+          return;
+        }
+        const body = {
+          phone: document.getElementById("phone").value.trim(),
+          company_name: document.getElementById("company_name").value.trim(),
+          cnpj: document.getElementById("cnpj").value.trim() || null,
+          top_n: parseInt(document.getElementById("top_n").value, 10) || 5,
+          opportunities,
+        };
+        const box = document.getElementById("preview-box");
+        const meta = document.getElementById("preview-meta");
+        box.textContent = "Montando preview…";
+        try {
+          const res = await fetch("/outreach/whatsapp/digest/preview", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+          });
+          const data = await res.json();
+          if (!res.ok) {
+            box.textContent = data.detail || JSON.stringify(data, null, 2);
+            meta.textContent = "Erro " + res.status;
+            return;
+          }
+          box.textContent = data.preview || "(vazio)";
+          meta.textContent = `${data.chars || 0} caracteres · ${data.items ?? "?"} itens`;
+        } catch (e) {
+          box.textContent = "Falha: " + (e.message || "API indisponível");
+        }
+      });
+    },
+  });
+</script>
+</body>
+</html>

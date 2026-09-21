@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LicitAll — Parser & Docling</title>
+  <link rel="icon" href="/ui/assets/logo.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet">
+  <link href="/ui/assets/app.css" rel="stylesheet">
+  <script src="/ui/assets/tailwind-theme.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwind.config = window.__LICITALL_TW__;</script>
+  <script src="/ui/assets/auth.js"></script>
+  <script src="/ui/assets/api.js"></script>
+  <script src="/ui/assets/shell.js"></script>
+</head>
+<body class="bg-background font-body-md text-body-md text-on-surface">
+<div id="app-root">
+<div data-page class="flex flex-col w-full gap-space-lg max-w-4xl">
+  <div class="bg-surface-container-lowest p-space-lg rounded shadow-sm flex items-start gap-3">
+    <span class="material-symbols-outlined text-secondary text-[32px]">document_scanner</span>
+    <div>
+      <h1 class="font-headline-lg text-headline-lg tracking-tight">Parser & Docling</h1>
+      <p class="font-body-md text-on-surface-variant mt-1">Converte PDFs/DOCX de editais em Markdown segmentado com referências de página para citação em peças (compliance Lei 14.133).</p>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-space-md">
+    <div class="bg-surface-container-lowest p-space-md rounded shadow-sm">
+      <h2 class="font-headline-sm font-bold mb-2">Fluxo</h2>
+      <ol class="list-decimal list-inside font-body-sm text-on-surface-variant space-y-2">
+        <li>Baixar anexos: <code class="font-data-mono text-[11px]">POST /ingestion/pncp/{id}/documents</code></li>
+        <li>Arquivos em <code class="font-data-mono text-[11px]">data/raw/{id_licitacao}</code></li>
+        <li>Parse Docling: <code class="font-data-mono text-[11px]">POST /parser/{id}</code></li>
+        <li>Seções mapeadas para <code class="font-data-mono text-[11px]">TenderSchema</code></li>
+      </ol>
+    </div>
+    <div class="bg-surface-container-lowest p-space-md rounded shadow-sm">
+      <h2 class="font-headline-sm font-bold mb-2">Engines</h2>
+      <ul class="font-body-sm text-on-surface-variant space-y-2">
+        <li class="flex items-center gap-2"><span class="h-2 w-2 rounded-full bg-on-tertiary-container"></span>Docling (preferencial, OCR local)</li>
+        <li class="flex items-center gap-2"><span class="h-2 w-2 rounded-full bg-outline"></span>Fallback PDF text extraction</li>
+      </ul>
+      <p id="docling-status" class="mt-3 font-data-mono text-[11px] text-outline">Verificando /health…</p>
+    </div>
+  </div>
+
+  <form id="parse-form" class="bg-surface-container-lowest p-space-lg rounded shadow-sm flex flex-col sm:flex-row gap-3 items-end">
+    <label class="flex-1 flex flex-col gap-1.5 w-full">
+      <span class="font-label-sm font-semibold text-on-surface-variant">ID PNCP</span>
+      <input id="id_pncp" type="text" placeholder="numeroControlePNCP" value=""
+        class="rounded bg-surface-container-low px-3 py-2 font-data-mono text-body-sm focus:outline-none focus:ring-2 focus:ring-secondary">
+    </label>
+    <button type="submit" class="shrink-0 flex items-center gap-2 px-4 py-2 rounded bg-secondary text-on-secondary font-label-md font-semibold shadow-sm">
+      <span class="material-symbols-outlined text-[18px]">play_arrow</span>Executar parse
+    </button>
+  </form>
+
+  <pre id="parse-result" class="hidden bg-surface-container-lowest p-space-md rounded shadow-sm font-data-mono text-[11px] overflow-auto max-h-96"></pre>
+
+  <div class="flex gap-3">
+    <a href="/docs#/default/parse_tender_documents_parser__id_pncp__post" target="_blank" rel="noopener" class="flex items-center gap-2 px-4 py-2 rounded bg-secondary text-on-secondary font-label-md font-semibold">
+      <span class="material-symbols-outlined text-[18px]">api</span>OpenAPI — POST /parser/{id}
+    </a>
+    <a href="/ui/edital.html" class="flex items-center gap-2 px-4 py-2 rounded bg-surface-container text-on-surface font-label-md">Ver explorador</a>
+  </div>
+</div>
+</div>
+<script>
+  LicitAllShell.mount({
+    active: "parser-docling",
+    onReady() {
+      const qid = new URLSearchParams(location.search).get("id");
+      if (qid) document.getElementById("id_pncp").value = qid;
+
+      fetch("/health").then((r) => r.json()).then((h) => {
+        const el = document.getElementById("docling-status");
+        el.textContent = h.docling_available ? "Docling: disponível ✓" : "Docling: indisponível (fallback ativo)";
+        el.className = "mt-3 font-data-mono text-[11px] " + (h.docling_available ? "text-on-tertiary-container" : "text-error");
+      }).catch(() => {
+        document.getElementById("docling-status").textContent = "API offline";
+      });
+
+      document.getElementById("parse-form").addEventListener("submit", async (ev) => {
+        ev.preventDefault();
+        const id = document.getElementById("id_pncp").value.trim();
+        if (!id) { alert("Informe o ID PNCP."); return; }
+        const pre = document.getElementById("parse-result");
+        pre.classList.remove("hidden");
+        pre.textContent = "Parsing…";
+        try {
+          const res = await fetch("/parser/" + id, { method: "POST" });
+          const data = await res.json();
+          pre.textContent = JSON.stringify({ status: res.status, ...data }, null, 2);
+        } catch (e) {
+          pre.textContent = e.message || "Erro";
+        }
+      });
+    },
+  });
+</script>
+</body>
+</html>

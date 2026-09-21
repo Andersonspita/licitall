@@ -26,8 +26,9 @@ class Settings(BaseSettings):
 
     pncp_consulta_base_url: str = "https://pncp.gov.br/api/consulta"
     pncp_core_base_url: str = "https://pncp.gov.br/api/pncp"
-    pncp_timeout_seconds: float = 60.0
+    pncp_timeout_seconds: float = 35.0
     pncp_page_size: int = 50
+    pncp_page_retries: int = 4
 
     minha_receita_base_url: str = "http://localhost:8001"
 

@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LicitAll — Pipeline LangGraph</title>
+  <link rel="icon" href="/ui/assets/logo.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet">
+  <link href="/ui/assets/app.css" rel="stylesheet">
+  <script src="/ui/assets/tailwind-theme.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwind.config = window.__LICITALL_TW__;</script>
+  <script src="/ui/assets/auth.js"></script>
+  <script src="/ui/assets/shell.js"></script>
+</head>
+<body class="bg-background font-body-md text-body-md text-on-surface">
+<div id="app-root">
+<div data-page class="flex flex-col w-full gap-space-lg max-w-4xl">
+  <div class="bg-surface-container-lowest p-space-lg rounded shadow-sm">
+    <div class="flex items-center gap-2 mb-2">
+      <span class="material-symbols-outlined text-secondary text-[28px]">account_tree</span>
+      <h1 class="font-headline-lg text-headline-lg tracking-tight">Pipeline LangGraph</h1>
+    </div>
+    <p class="font-body-md text-on-surface-variant">Grafo de agentes: ingestão PNCP → download TR → Docling → extractor → RAG jurídico → matchmaking → advisory → outreach.</p>
+  </div>
+
+  <div class="bg-surface-container-lowest p-space-lg rounded shadow-sm">
+    <h2 class="font-headline-sm font-bold mb-4">Nós do grafo</h2>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div class="p-space-md rounded bg-surface-container-low border-l-4 border-secondary">
+        <div class="font-data-mono text-[10px] text-outline font-bold">NODE 01</div>
+        <div class="font-label-lg font-bold mt-1">Mineração PNCP</div>
+        <p class="font-body-sm text-on-surface-variant mt-1">POST /ingestion/pncp/sync</p>
+      </div>
+      <div class="p-space-md rounded bg-surface-container-low border-l-4 border-secondary">
+        <div class="font-data-mono text-[10px] text-outline font-bold">NODE 02</div>
+        <div class="font-label-lg font-bold mt-1">Download documentos</div>
+        <p class="font-body-sm text-on-surface-variant mt-1">POST /ingestion/pncp/{id}/documents</p>
+      </div>
+      <div class="p-space-md rounded bg-surface-container-high border-l-4 border-secondary shadow-sm">
+        <div class="font-data-mono text-[10px] text-secondary font-bold">NODE 03</div>
+        <div class="font-label-lg font-bold mt-1">Docling OCR + Markdown</div>
+        <p class="font-body-sm text-on-surface-variant mt-1">POST /parser/{id}</p>
+      </div>
+      <div class="p-space-md rounded bg-surface-container-low border-l-4 border-secondary">
+        <div class="font-data-mono text-[10px] text-outline font-bold">NODE 04</div>
+        <div class="font-label-lg font-bold mt-1">Extractor + RAG Lei 14.133</div>
+        <p class="font-body-sm text-on-surface-variant mt-1">POST /agents/{id}/extract · POST /agents/{id}/graph</p>
+      </div>
+      <div class="p-space-md rounded bg-surface-container-low border-l-4 border-secondary">
+        <div class="font-data-mono text-[10px] text-outline font-bold">NODE 05</div>
+        <div class="font-label-lg font-bold mt-1">Matchmaking B2G</div>
+        <p class="font-body-sm text-on-surface-variant mt-1">POST /matching/company</p>
+      </div>
+      <div class="p-space-md rounded bg-surface-container-low border-l-4 border-secondary">
+        <div class="font-data-mono text-[10px] text-outline font-bold">NODE 06</div>
+        <div class="font-label-lg font-bold mt-1">Kit advisory + WhatsApp</div>
+        <p class="font-body-sm text-on-surface-variant mt-1">POST /advisory/generate · POST /pipeline/{id}/run</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="flex flex-wrap gap-3">
+    <a href="/docs" target="_blank" rel="noopener" class="flex items-center gap-2 px-4 py-2 rounded bg-secondary text-on-secondary font-label-md font-semibold shadow-sm">
+      <span class="material-symbols-outlined text-[18px]">api</span>Abrir OpenAPI /docs
+    </a>
+    <a href="/ui/edital.html" class="flex items-center gap-2 px-4 py-2 rounded bg-surface-container text-on-surface font-label-md">
+      <span class="material-symbols-outlined text-[18px]">document_scanner</span>Explorador de edital
+    </a>
+    <a href="/ui/monitor-pncp.html" class="flex items-center gap-2 px-4 py-2 rounded bg-surface-container text-on-surface font-label-md">
+      <span class="material-symbols-outlined text-[18px]">sync</span>Sync PNCP
+    </a>
+  </div>
+
+  <p class="font-label-sm text-[11px] text-outline">Marco legal: Lei Federal nº 14.133/2021. Peças geradas incluem disclaimer OAB (Lei 8.906/1994).</p>
+</div>
+</div>
+<script>
+  LicitAllShell.mount({ active: "pipeline-langgraph" });
+</script>
+</body>
+</html>

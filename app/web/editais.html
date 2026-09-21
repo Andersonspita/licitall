@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LicitAll — Editais & TRs</title>
+  <link rel="icon" href="/ui/assets/logo.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet">
+  <link href="/ui/assets/app.css" rel="stylesheet">
+  <script src="/ui/assets/tailwind-theme.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwind.config = window.__LICITALL_TW__;</script>
+  <script src="/ui/assets/auth.js"></script>
+  <script src="/ui/assets/api.js"></script>
+  <script src="/ui/assets/shell.js"></script>
+</head>
+<body class="bg-background font-body-md text-body-md text-on-surface">
+<div id="app-root">
+<div data-page class="flex flex-col w-full gap-space-lg">
+  <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-space-md bg-surface-container-lowest p-space-lg rounded shadow-sm">
+    <div>
+      <nav class="font-label-sm text-label-sm text-outline flex items-center gap-1 mb-1">
+        <a href="/ui/dashboard.html" class="hover:text-secondary">Dashboard</a>
+        <span class="material-symbols-outlined text-[14px]">chevron_right</span>
+        <span class="text-on-surface font-semibold">Editais & TRs</span>
+      </nav>
+      <h1 class="font-headline-lg text-headline-lg text-on-surface tracking-tight">Base de Editais e Termos de Referência</h1>
+      <p class="font-body-md text-on-surface-variant mt-1">Dados reais de <code class="font-data-mono text-[12px]">tender_ingest</code> — filtre por UF, status, ID, órgão ou objeto.</p>
+    </div>
+    <div class="flex flex-wrap items-center gap-2">
+      <a href="/ui/monitor-pncp.html" class="flex items-center gap-2 px-3 py-2 rounded bg-secondary text-on-secondary font-label-md font-semibold shadow-sm">
+        <span class="material-symbols-outlined text-[18px]">sync</span>Sincronizar PNCP
+      </a>
+    </div>
+  </div>
+
+  <div class="bg-surface-container-lowest rounded shadow-sm overflow-hidden">
+    <div class="p-space-md bg-surface-container-low flex flex-col gap-3">
+      <div class="flex flex-col sm:flex-row sm:items-center gap-3">
+        <div class="relative flex-1 max-w-xl">
+          <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-[18px]">search</span>
+          <input id="search-input" type="search" placeholder="Buscar ID PNCP, órgão, objeto…"
+            class="w-full bg-surface-container-lowest pl-10 pr-4 py-2 rounded text-on-surface font-body-sm focus:outline-none focus:ring-2 focus:ring-secondary shadow-sm">
+        </div>
+        <select id="filter-uf" class="px-3 py-2 rounded bg-surface-container-lowest font-label-sm text-on-surface shadow-sm">
+          <option value="">Todas UFs</option>
+          <option>AC</option><option>AL</option><option>AM</option><option>AP</option><option>BA</option>
+          <option>CE</option><option>DF</option><option>ES</option><option>GO</option><option>MA</option>
+          <option>MG</option><option>MS</option><option>MT</option><option>PA</option><option>PB</option>
+          <option>PE</option><option>PI</option><option>PR</option><option>RJ</option><option>RN</option>
+          <option>RO</option><option>RR</option><option>RS</option><option>SC</option><option>SE</option>
+          <option>SP</option><option>TO</option>
+        </select>
+        <select id="filter-status" class="px-3 py-2 rounded bg-surface-container-lowest font-label-sm text-on-surface shadow-sm">
+          <option value="">Todos status</option>
+          <option value="INGESTED">INGESTED</option>
+          <option value="PARSED">PARSED</option>
+          <option value="EXTRACTED">EXTRACTED</option>
+          <option value="MATCHED">MATCHED</option>
+          <option value="NOTIFIED">NOTIFIED</option>
+          <option value="FAILED">FAILED</option>
+        </select>
+        <button id="btn-reload" type="button" class="px-3 py-2 rounded bg-surface-container text-on-surface font-label-sm font-semibold hover:bg-surface-container-high">
+          Atualizar
+        </button>
+      </div>
+      <div class="flex items-center gap-2 font-label-sm text-on-surface-variant">
+        <span id="result-count">—</span>
+        <span class="px-2 py-0.5 rounded bg-secondary-fixed text-on-secondary-fixed font-bold">Lei 14.133/2021</span>
+      </div>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-left min-w-[800px]">
+        <thead>
+          <tr class="bg-surface-container text-on-surface-variant font-label-md uppercase tracking-wider">
+            <th class="px-4 py-3">ID PNCP</th>
+            <th class="px-4 py-3">Órgão / UF</th>
+            <th class="px-4 py-3">Objeto</th>
+            <th class="px-4 py-3">Modalidade</th>
+            <th class="px-4 py-3 text-right">Valor</th>
+            <th class="px-4 py-3 text-center">Art.164</th>
+            <th class="px-4 py-3 text-center">Status</th>
+            <th class="px-4 py-3 text-right">Ações</th>
+          </tr>
+        </thead>
+        <tbody id="editais-tbody" class="divide-y divide-surface-container">
+          <tr><td colspan="8" class="px-4 py-8 text-on-surface-variant text-center">Carregando dados reais…</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="p-space-sm bg-surface-container-low flex items-center justify-between gap-2 border-t border-surface-container">
+      <button id="btn-prev" type="button" class="px-3 py-1.5 rounded bg-surface-container font-label-sm disabled:opacity-40" disabled>Anterior</button>
+      <span id="page-info" class="font-data-mono text-[11px] text-outline">—</span>
+      <button id="btn-next" type="button" class="px-3 py-1.5 rounded bg-surface-container font-label-sm disabled:opacity-40" disabled>Próxima</button>
+    </div>
+  </div>
+
+  <p class="font-label-sm text-[11px] text-outline text-center">
+    Fonte: Postgres <code class="font-data-mono">tender_ingest</code>. Sem sync recente?
+    Use <a class="text-secondary font-semibold hover:underline" href="/ui/monitor-pncp.html">Monitor PNCP</a>.
+  </p>
+</div>
+</div>
+<script>
+  const PAGE_SIZE = 50;
+  let offset = 0;
+  let total = 0;
+  let debounceTimer = null;
+
+  function currentFilters() {
+    return {
+      q: document.getElementById("search-input")?.value || "",
+      uf: document.getElementById("filter-uf")?.value || "",
+      status: document.getElementById("filter-status")?.value || "",
+      limit: PAGE_SIZE,
+      offset,
+    };
+  }
+
+  function syncUrl() {
+    const f = currentFilters();
+    const url = new URL(location.href);
+    ["q", "uf", "status"].forEach((k) => {
+      if (f[k]) url.searchParams.set(k, f[k]);
+      else url.searchParams.delete(k);
+    });
+    if (offset) url.searchParams.set("offset", String(offset));
+    else url.searchParams.delete("offset");
+    history.replaceState(null, "", url);
+  }
+
+  function renderTable(items) {
+    const tb = document.getElementById("editais-tbody");
+    document.getElementById("result-count").textContent = `${items.length} nesta página · ${total} no total`;
+    document.getElementById("page-info").textContent =
+      total === 0 ? "0 resultados" : `${offset + 1}–${Math.min(offset + items.length, total)} de ${total}`;
+    document.getElementById("btn-prev").disabled = offset <= 0;
+    document.getElementById("btn-next").disabled = offset + PAGE_SIZE >= total;
+
+    if (!items.length) {
+      tb.innerHTML = `<tr><td colspan="8" class="px-4 py-10 text-center text-on-surface-variant">
+        Nenhum edital no banco. Sincronize o PNCP em <a class="text-secondary font-semibold" href="/ui/monitor-pncp.html">Monitor PNCP</a>.
+      </td></tr>`;
+      return;
+    }
+    tb.innerHTML = items.map((r) => {
+      const art = LicitAllApi.art164Label(r.art164);
+      const id = r.id_pncp;
+      return `<tr class="hover:bg-surface-container-low">
+        <td class="px-4 py-3 font-data-mono text-[12px] font-bold text-secondary">${esc(id)}</td>
+        <td class="px-4 py-3">
+          <div class="font-label-md font-semibold">${esc(r.orgao_comprador || "—")}</div>
+          <div class="font-label-sm text-outline">${esc(r.uf || "—")}${r.municipio ? " · " + esc(r.municipio) : ""}</div>
+        </td>
+        <td class="px-4 py-3 font-body-sm max-w-xs"><p class="line-clamp-2">${esc(r.objeto_resumido || "—")}</p></td>
+        <td class="px-4 py-3 font-label-sm">${esc(r.modalidade || "—")}</td>
+        <td class="px-4 py-3 text-right font-data-mono text-[12px] font-bold">${LicitAllApi.formatBRL(r.valor_total_estimado)}</td>
+        <td class="px-4 py-3 text-center"><span class="px-1.5 py-0.5 rounded font-data-mono text-[10px] ${art.className}">${esc(art.text)}</span></td>
+        <td class="px-4 py-3 text-center"><span class="px-2 py-0.5 rounded bg-surface-container font-label-sm font-bold">${esc(r.status || "—")}</span></td>
+        <td class="px-4 py-3 text-right whitespace-nowrap">
+          <a href="/ui/edital.html?id=${encodeURIComponent(id)}" class="px-2.5 py-1 rounded bg-secondary text-on-secondary font-label-sm font-semibold">Analisar</a>
+          <a href="/ui/pecas.html?id=${encodeURIComponent(id)}" class="px-2.5 py-1 rounded bg-surface-container text-on-surface font-label-sm font-semibold">Peças</a>
+        </td>
+      </tr>`;
+    }).join("");
+  }
+
+  function esc(s) {
+    return String(s ?? "")
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+
+  async function load() {
+    const tb = document.getElementById("editais-tbody");
+    tb.innerHTML = `<tr><td colspan="8" class="px-4 py-8 text-center text-on-surface-variant">Carregando…</td></tr>`;
+    syncUrl();
+    try {
+      const data = await LicitAllApi.listTenders(currentFilters());
+      total = data.total || 0;
+      renderTable(data.items || []);
+    } catch (err) {
+      tb.innerHTML = `<tr><td colspan="8" class="px-4 py-8 text-center text-error">Falha ao listar: ${esc(err.message)}. Verifique Postgres e uvicorn.</td></tr>`;
+    }
+  }
+
+  LicitAllShell.mount({
+    active: "editais-e-trs",
+    onReady() {
+      const params = new URLSearchParams(location.search);
+      document.getElementById("search-input").value = params.get("q") || "";
+      document.getElementById("filter-uf").value = params.get("uf") || "";
+      document.getElementById("filter-status").value = params.get("status") || "";
+      offset = Number(params.get("offset") || 0) || 0;
+
+      const reload = () => { offset = 0; load(); };
+      document.getElementById("search-input").addEventListener("input", () => {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(reload, 350);
+      });
+      document.getElementById("filter-uf").addEventListener("change", reload);
+      document.getElementById("filter-status").addEventListener("change", reload);
+      document.getElementById("btn-reload").addEventListener("click", load);
+      document.getElementById("btn-prev").addEventListener("click", () => {
+        offset = Math.max(0, offset - PAGE_SIZE);
+        load();
+      });
+      document.getElementById("btn-next").addEventListener("click", () => {
+        offset += PAGE_SIZE;
+        load();
+      });
+      load();
+    },
+  });
+</script>
+</body>
+</html>

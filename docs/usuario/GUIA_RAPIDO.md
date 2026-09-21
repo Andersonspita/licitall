@@ -16,7 +16,7 @@
 
 ## Fluxo do dia a dia (Fase 2)
 
-1. **Sincronizar** — `POST /ingestion/pncp/sync` (ex.: `{"uf":"SP","only_open":true}`)  
+1. **Sincronizar** — Dashboard ou `POST /ingestion/pncp/sync/async` com `{"uf":"BR","only_open":true}` (lista cresce enquanto roda)  
 2. **Baixar anexos** — `POST /ingestion/pncp/{numeroControlePNCP}/documents`  
 3. **Parsear** — `POST /parser/{numeroControlePNCP}`  
 4. **Extrair** — `POST /agents/{numeroControlePNCP}/extract` (com RAG da Lei 14.133)  

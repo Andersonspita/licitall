@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LicitAll — Matchmaking B2G</title>
+  <link rel="icon" href="/ui/assets/logo.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet">
+  <link href="/ui/assets/app.css" rel="stylesheet">
+  <script src="/ui/assets/tailwind-theme.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwind.config = window.__LICITALL_TW__;</script>
+  <script src="/ui/assets/auth.js"></script>
+  <script src="/ui/assets/shell.js"></script>
+</head>
+<body class="bg-background font-body-md text-body-md text-on-surface">
+<div id="app-root">
+<div data-page class="flex flex-col w-full gap-space-lg">
+  <div class="bg-surface-container-lowest p-space-lg rounded shadow-sm flex flex-col lg:flex-row lg:items-center justify-between gap-space-md">
+    <div class="flex items-start gap-3">
+      <span class="material-symbols-outlined text-secondary text-[32px]">handshake</span>
+      <div>
+        <h1 class="font-headline-lg text-headline-lg tracking-tight">Matchmaking B2G</h1>
+        <p class="font-body-sm text-on-surface-variant mt-1">Match inverso: CNPJ → oportunidades ranqueadas (CNAE · geo · porte · prazo). Apenas empresas ATIVAS.</p>
+      </div>
+    </div>
+    <span class="px-2 py-1 rounded bg-secondary-fixed text-on-secondary-fixed font-label-sm font-bold">POST /matching/company</span>
+  </div>
+
+  <form id="match-form" class="grid grid-cols-1 lg:grid-cols-12 gap-space-md">
+    <div class="lg:col-span-4 bg-surface-container-lowest p-space-lg rounded shadow-sm flex flex-col gap-space-md">
+      <label class="flex flex-col gap-1.5">
+        <span class="font-label-sm font-semibold text-on-surface-variant">CNPJ da empresa</span>
+        <input id="cnpj" type="text" required placeholder="00.000.000/0001-00"
+          class="rounded bg-surface-container-low px-3 py-2 font-data-mono text-body-sm focus:outline-none focus:ring-2 focus:ring-secondary">
+      </label>
+      <label class="flex flex-col gap-1.5">
+        <span class="font-label-sm font-semibold text-on-surface-variant">UF filtro (opcional)</span>
+        <input id="uf" type="text" maxlength="2" placeholder="SP"
+          class="rounded bg-surface-container-low px-3 py-2 font-body-sm uppercase focus:outline-none focus:ring-2 focus:ring-secondary">
+      </label>
+      <label class="flex flex-col gap-1.5">
+        <span class="font-label-sm font-semibold text-on-surface-variant">Score mínimo</span>
+        <input id="min_score" type="number" value="40" min="0" max="100" step="1"
+          class="rounded bg-surface-container-low px-3 py-2 font-body-sm focus:outline-none focus:ring-2 focus:ring-secondary">
+      </label>
+      <label class="flex items-center gap-2">
+        <input id="require_proximity" type="checkbox" class="accent-secondary w-4 h-4">
+        <span class="font-label-sm">Exigir proximidade geográfica</span>
+      </label>
+      <button type="submit" class="flex items-center justify-center gap-2 py-2.5 rounded bg-secondary text-on-secondary font-label-md font-semibold shadow-sm">
+        <span class="material-symbols-outlined text-[18px]">play_arrow</span>Executar match
+      </button>
+    </div>
+    <div class="lg:col-span-8 bg-surface-container-lowest p-space-lg rounded shadow-sm flex flex-col gap-space-sm">
+      <label class="flex flex-col gap-1.5 flex-1">
+        <span class="font-label-sm font-semibold text-on-surface-variant">Tenders JSON (opcional — senão usa tender_ingest)</span>
+        <textarea id="tenders-json" rows="8" placeholder='[{"id_pncp":"...","objeto":"...","uf":"DF"}]'
+          class="rounded bg-surface-container-low px-3 py-2 font-data-mono text-[11px] focus:outline-none focus:ring-2 focus:ring-secondary resize-y min-h-[120px]"></textarea>
+      </label>
+      <p class="font-label-sm text-outline">Fonte CNPJ: Minha Receita · Marco: Lei 14.133/2021 · LC 123/2006 (ME/EPP)</p>
+    </div>
+  </form>
+
+  <div id="match-results" class="hidden bg-surface-container-lowest rounded shadow-sm overflow-hidden">
+    <div class="p-space-md bg-surface-container-low flex items-center justify-between">
+      <h2 class="font-headline-sm font-bold">Resultados BID / REVIEW / SKIP</h2>
+      <div class="flex gap-2 font-label-sm">
+        <span class="px-2 py-0.5 rounded bg-tertiary-fixed text-on-tertiary-fixed font-bold">BID ≥ 70</span>
+        <span class="px-2 py-0.5 rounded bg-secondary-fixed text-on-secondary-fixed font-bold">REVIEW 40–69</span>
+        <span class="px-2 py-0.5 rounded bg-surface-container text-outline font-bold">SKIP &lt; 40</span>
+      </div>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-left">
+        <thead>
+          <tr class="bg-surface-container text-on-surface-variant font-label-md uppercase tracking-wider">
+            <th class="px-4 py-3">Recomendação</th>
+            <th class="px-4 py-3">Score</th>
+            <th class="px-4 py-3">ID / Órgão</th>
+            <th class="px-4 py-3">Objeto</th>
+            <th class="px-4 py-3">Motivos</th>
+          </tr>
+        </thead>
+        <tbody id="match-tbody" class="divide-y divide-surface-container"></tbody>
+      </table>
+    </div>
+    <pre id="match-raw" class="hidden m-space-md p-space-sm bg-surface-container-low rounded font-data-mono text-[10px] overflow-auto max-h-48"></pre>
+  </div>
+</div>
+</div>
+<script>
+  const REC_CLASS = {
+    BID: "bg-tertiary-fixed text-on-tertiary-fixed",
+    REVIEW: "bg-secondary-fixed text-on-secondary-fixed",
+    SKIP: "bg-surface-container text-outline",
+  };
+
+  LicitAllShell.mount({
+    active: "matchmaking-b2g",
+    onReady() {
+      document.getElementById("match-form").addEventListener("submit", async (ev) => {
+        ev.preventDefault();
+        const body = {
+          cnpj: document.getElementById("cnpj").value.trim(),
+          min_score: parseFloat(document.getElementById("min_score").value) || 40,
+          require_proximity: document.getElementById("require_proximity").checked,
+          limit: 20,
+        };
+        const uf = document.getElementById("uf").value.trim();
+        if (uf) body.uf = uf.toUpperCase();
+        const tendersRaw = document.getElementById("tenders-json").value.trim();
+        if (tendersRaw) {
+          try {
+            body.tenders = JSON.parse(tendersRaw);
+          } catch {
+            alert("JSON de tenders inválido");
+            return;
+          }
+        }
+
+        const box = document.getElementById("match-results");
+        const tb = document.getElementById("match-tbody");
+        box.classList.remove("hidden");
+        tb.innerHTML = `<tr><td colspan="5" class="px-4 py-6 text-center text-on-surface-variant">Processando match…</td></tr>`;
+
+        try {
+          const res = await fetch("/matching/company", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+          });
+          const data = await res.json();
+          document.getElementById("match-raw").textContent = JSON.stringify(data, null, 2);
+
+          const matches = data.matches || data.opportunities || [];
+          if (!matches.length) {
+            tb.innerHTML = `<tr><td colspan="5" class="px-4 py-6 text-center text-on-surface-variant">${data.detail || "Nenhum match retornado."}</td></tr>`;
+            return;
+          }
+          tb.innerHTML = matches.map((m) => {
+            const rec = m.recommendation || "SKIP";
+            const cls = REC_CLASS[rec] || REC_CLASS.SKIP;
+            const reasons = (m.reasons || m.breakdown?.reasons || []).slice(0, 3).join("; ") || "—";
+            return `<tr class="hover:bg-surface-container-low">
+              <td class="px-4 py-3"><span class="px-2 py-0.5 rounded font-data-mono text-[12px] font-bold ${cls}">${rec}</span></td>
+              <td class="px-4 py-3 font-data-mono font-bold">${(m.score ?? m.total_score ?? 0).toFixed(1)}</td>
+              <td class="px-4 py-3"><div class="font-data-mono text-[11px] text-secondary">${m.id_pncp || "—"}</div><div class="font-label-sm">${m.orgao || ""}</div></td>
+              <td class="px-4 py-3 font-body-sm max-w-xs line-clamp-2">${m.objeto || "—"}</td>
+              <td class="px-4 py-3 font-label-sm text-on-surface-variant">${reasons}</td>
+            </tr>`;
+          }).join("");
+        } catch (e) {
+          tb.innerHTML = `<tr><td colspan="5" class="px-4 py-6 text-center text-error">${e.message || "API indisponível"}</td></tr>`;
+        }
+      });
+    },
+  });
+</script>
+</body>
+</html>

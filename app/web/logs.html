@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LicitAll — Logs & Microserviços</title>
+  <link rel="icon" href="/ui/assets/logo.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet">
+  <link href="/ui/assets/app.css" rel="stylesheet">
+  <script src="/ui/assets/tailwind-theme.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwind.config = window.__LICITALL_TW__;</script>
+  <script src="/ui/assets/auth.js"></script>
+  <script src="/ui/assets/shell.js"></script>
+</head>
+<body class="bg-background font-body-md text-body-md text-on-surface">
+<div id="app-root">
+<div data-page class="flex flex-col w-full gap-space-lg max-w-5xl">
+  <div class="bg-surface-container-lowest p-space-lg rounded shadow-sm flex items-center justify-between gap-space-md flex-wrap">
+    <div class="flex items-center gap-2">
+      <span class="material-symbols-outlined text-secondary text-[28px]">terminal</span>
+      <div>
+        <h1 class="font-headline-lg text-headline-lg tracking-tight">Logs & Microserviços</h1>
+        <p class="font-body-sm text-on-surface-variant">Health checks da API e dependências externas.</p>
+      </div>
+    </div>
+    <button id="btn-refresh" type="button" class="flex items-center gap-2 px-3 py-2 rounded bg-secondary text-on-secondary font-label-md font-semibold">
+      <span class="material-symbols-outlined text-[18px]">refresh</span>Atualizar
+    </button>
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-space-md">
+    <div class="bg-surface-container-lowest rounded shadow-sm overflow-hidden">
+      <div class="p-space-sm bg-surface-container-low font-label-md font-bold flex items-center gap-2">
+        <span class="material-symbols-outlined text-[18px]">favorite</span>GET /health
+      </div>
+      <pre id="health-json" class="p-space-md font-data-mono text-[11px] text-on-surface-variant overflow-auto max-h-80">Carregando…</pre>
+    </div>
+    <div class="bg-surface-container-lowest rounded shadow-sm overflow-hidden">
+      <div class="p-space-sm bg-surface-container-low font-label-md font-bold flex items-center gap-2">
+        <span class="material-symbols-outlined text-[18px]">cable</span>GET /health/deps
+      </div>
+      <pre id="deps-json" class="p-space-md font-data-mono text-[11px] text-on-surface-variant overflow-auto max-h-80">Carregando…</pre>
+    </div>
+  </div>
+
+  <div id="deps-cards" class="grid grid-cols-2 sm:grid-cols-4 gap-2"></div>
+
+  <p class="font-label-sm text-[11px] text-outline text-center">
+    Stack: FastAPI · PostgreSQL 16 + pgvector · Redis · Minha Receita · Evolution API · Docling
+  </p>
+</div>
+</div>
+<script>
+  async function loadLogs() {
+    const hEl = document.getElementById("health-json");
+    const dEl = document.getElementById("deps-json");
+    const cards = document.getElementById("deps-cards");
+    try {
+      const [h, d] = await Promise.all([
+        fetch("/health").then((r) => r.json()),
+        fetch("/health/deps").then((r) => r.json()),
+      ]);
+      hEl.textContent = JSON.stringify(h, null, 2);
+      dEl.textContent = JSON.stringify(d, null, 2);
+      const deps = d.dependencies || d.deps || d;
+      const keys = ["postgres", "redis", "minha_receita", "evolution"];
+      cards.innerHTML = keys.map((k) => {
+        const ok = Boolean(deps[k]?.ok ?? deps[k]);
+        return `<div class="p-space-sm rounded bg-surface-container-lowest shadow-sm text-center">
+          <span class="inline-block h-3 w-3 rounded-full ${ok ? "bg-on-tertiary-container" : "bg-error"} mb-1"></span>
+          <div class="font-label-sm font-bold">${k}</div>
+          <div class="font-data-mono text-[10px] text-outline">${ok ? "OK" : "FAIL"}</div>
+        </div>`;
+      }).join("");
+    } catch (e) {
+      hEl.textContent = "Erro: " + (e.message || "offline");
+      dEl.textContent = "Erro: API indisponível em :8000";
+      cards.innerHTML = "";
+    }
+  }
+
+  LicitAllShell.mount({
+    active: "logs-microservicos",
+    onReady() {
+      loadLogs();
+      document.getElementById("btn-refresh")?.addEventListener("click", loadLogs);
+    },
+  });
+</script>
+</body>
+</html>

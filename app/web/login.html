@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LicitAll — Login</title>
+  <link rel="icon" href="/ui/assets/logo.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet">
+  <link href="/ui/assets/app.css" rel="stylesheet">
+  <script src="/ui/assets/tailwind-theme.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwind.config = window.__LICITALL_TW__;</script>
+  <script src="/ui/assets/auth.js"></script>
+</head>
+<body class="min-h-screen bg-background text-on-surface">
+  <div class="min-h-screen grid lg:grid-cols-2">
+    <section class="relative hidden lg:flex flex-col justify-between p-10 overflow-hidden" style="background: linear-gradient(160deg, #1a2438 0%, #1f2f4d 55%, #1b4b91 140%);">
+      <div class="absolute inset-0 opacity-30" style="background-image: radial-gradient(circle at 20% 20%, #2e5fa8 0, transparent 35%), radial-gradient(circle at 80% 70%, #3f6b46 0, transparent 30%);"></div>
+      <div class="relative z-10">
+        <div class="flex items-center gap-3">
+          <img src="/ui/assets/logo.svg" alt="LicitAll" class="h-10 w-10 brightness-0 invert">
+          <span class="font-headline-md text-headline-md text-white tracking-tight">LicitAll</span>
+        </div>
+        <p class="mt-6 max-w-md text-white/80 font-body-md text-body-md leading-relaxed">
+          Automação do ciclo B2G: PNCP → Docling → LangGraph → matchmaking → minutas → WhatsApp.
+          Marco <strong class="text-white">Lei 14.133/2021</strong> com salvaguarda <strong class="text-white">OAB 8.906/1994</strong>.
+        </p>
+      </div>
+      <div class="relative z-10 grid gap-3 max-w-md">
+        <div class="rounded-xl bg-white/10 backdrop-blur px-4 py-3 text-white/90 text-sm flex items-start gap-3">
+          <span class="material-symbols-outlined text-[#aec6e8]">radar</span>
+          <div><div class="font-semibold">Monitor PNCP</div><div class="text-white/70 text-xs">Ingestão e sincronização de publicações</div></div>
+        </div>
+        <div class="rounded-xl bg-white/10 backdrop-blur px-4 py-3 text-white/90 text-sm flex items-start gap-3">
+          <span class="material-symbols-outlined text-[#aec6e8]">handshake</span>
+          <div><div class="font-semibold">Match BID / REVIEW / SKIP</div><div class="text-white/70 text-xs">Score explicável CNAE · geo · porte · prazo</div></div>
+        </div>
+        <div class="rounded-xl bg-white/10 backdrop-blur px-4 py-3 text-white/90 text-sm flex items-start gap-3">
+          <span class="material-symbols-outlined text-[#aec6e8]">gavel</span>
+          <div><div class="font-semibold">Peças com disclaimer OAB</div><div class="text-white/70 text-xs">Minutas de suporte — revisão humana obrigatória</div></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="flex items-center justify-center p-6 sm:p-10">
+      <div class="w-full max-w-md">
+        <div class="lg:hidden mb-8 flex items-center gap-3">
+          <img src="/ui/assets/logo.svg" alt="LicitAll" class="h-9 w-9">
+          <span class="font-headline-md text-headline-md text-on-surface tracking-tight">LicitAll</span>
+        </div>
+        <div class="la-paper rounded-xl p-6 sm:p-8 bg-surface-container-lowest">
+          <span class="inline-flex px-2 py-0.5 rounded bg-secondary-fixed text-on-secondary-fixed font-label-sm text-label-sm uppercase tracking-wider font-bold">Acesso operacional</span>
+          <h1 class="mt-3 font-headline-lg text-headline-lg text-on-surface tracking-tight">Entrar no LicitAll</h1>
+          <p class="mt-1 font-body-md text-body-md text-on-surface-variant">Use suas credenciais GovOps para o painel Fase 6.</p>
+
+          <form id="login-form" class="mt-6 flex flex-col gap-4" novalidate>
+            <label class="flex flex-col gap-1.5">
+              <span class="font-label-sm text-label-sm text-on-surface-variant font-semibold">E-mail</span>
+              <input id="email" type="email" required autocomplete="username"
+                class="w-full rounded bg-surface-container-low px-3 py-2.5 text-on-surface font-body-sm focus:outline-none focus:ring-2 focus:ring-secondary"
+                placeholder="admin@licitall.local" value="admin@licitall.local">
+            </label>
+            <label class="flex flex-col gap-1.5">
+              <span class="font-label-sm text-label-sm text-on-surface-variant font-semibold">Senha</span>
+              <input id="password" type="password" required autocomplete="current-password"
+                class="w-full rounded bg-surface-container-low px-3 py-2.5 text-on-surface font-body-sm focus:outline-none focus:ring-2 focus:ring-secondary"
+                placeholder="••••••••" value="licitall">
+            </label>
+            <p id="login-error" class="hidden text-error font-label-sm text-label-sm"></p>
+            <button type="submit"
+              class="w-full flex items-center justify-center gap-2 py-2.5 rounded bg-secondary text-on-secondary font-label-md text-label-md font-semibold hover:bg-secondary-container hover:text-on-secondary-container transition-all shadow-sm">
+              <span class="material-symbols-outlined text-[18px]">login</span>
+              Acessar dashboard
+            </button>
+          </form>
+
+          <div class="mt-5 p-3 rounded bg-surface-container-low font-data-mono text-[11px] text-on-surface-variant">
+            Demo: <strong class="text-on-surface">admin@licitall.local</strong> / <strong class="text-on-surface">licitall</strong>
+          </div>
+          <p class="mt-4 font-label-sm text-[11px] text-outline leading-relaxed">
+            Minutas e pareceres gerados por IA são suporte técnico (Lei 8.906/1994) e exigem revisão humana.
+          </p>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+    if (LicitAllAuth.isAuthenticated()) {
+      const params = new URLSearchParams(location.search);
+      location.replace(params.get("next") || "/ui/dashboard.html");
+    }
+    document.getElementById("login-form").addEventListener("submit", (ev) => {
+      ev.preventDefault();
+      const err = document.getElementById("login-error");
+      err.classList.add("hidden");
+      try {
+        LicitAllAuth.login(
+          document.getElementById("email").value,
+          document.getElementById("password").value
+        );
+        const params = new URLSearchParams(location.search);
+        location.href = params.get("next") || "/ui/dashboard.html";
+      } catch (e) {
+        err.textContent = e.message || "Falha no login";
+        err.classList.remove("hidden");
+      }
+    });
+  </script>
+</body>
+</html>

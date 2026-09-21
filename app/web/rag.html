@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LicitAll — RAG Lei 14.133</title>
+  <link rel="icon" href="/ui/assets/logo.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet">
+  <link href="/ui/assets/app.css" rel="stylesheet">
+  <script src="/ui/assets/tailwind-theme.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwind.config = window.__LICITALL_TW__;</script>
+  <script src="/ui/assets/auth.js"></script>
+  <script src="/ui/assets/shell.js"></script>
+</head>
+<body class="bg-background font-body-md text-body-md text-on-surface">
+<div id="app-root">
+<div data-page class="flex flex-col w-full gap-space-lg max-w-4xl">
+  <div class="bg-surface-container-lowest p-space-lg rounded shadow-sm">
+    <div class="flex items-center gap-2 mb-2">
+      <span class="material-symbols-outlined text-secondary text-[28px]">menu_book</span>
+      <h1 class="font-headline-lg text-headline-lg tracking-tight">RAG Lei 14.133 + TCU</h1>
+    </div>
+    <p class="font-body-md text-on-surface-variant">Corpus jurídico indexado (pgvector/JSONB) para fundamentação de peças e triagem de riscos — nunca inventar exigências ausentes do edital.</p>
+    <div class="flex flex-wrap gap-2 mt-3">
+      <span class="px-2 py-0.5 rounded bg-secondary-fixed text-on-secondary-fixed font-label-sm font-bold">Lei 14.133/2021</span>
+      <span class="px-2 py-0.5 rounded bg-surface-container font-label-sm font-bold">Seed TCU</span>
+    </div>
+  </div>
+
+  <div class="bg-surface-container-lowest p-space-lg rounded shadow-sm flex flex-col gap-space-md">
+    <h2 class="font-headline-sm font-bold">Busca semântica</h2>
+    <form id="rag-search-form" class="flex flex-col sm:flex-row gap-2">
+      <input id="rag-q" type="search" required placeholder="Ex.: impugnação prazo Art. 164 dias úteis"
+        class="flex-1 rounded bg-surface-container-low px-3 py-2 font-body-sm focus:outline-none focus:ring-2 focus:ring-secondary">
+      <input id="rag-top-k" type="number" value="5" min="1" max="20" title="top_k"
+        class="w-20 rounded bg-surface-container-low px-3 py-2 font-data-mono text-body-sm focus:outline-none focus:ring-2 focus:ring-secondary">
+      <button type="submit" class="flex items-center justify-center gap-2 px-4 py-2 rounded bg-secondary text-on-secondary font-label-md font-semibold">
+        <span class="material-symbols-outlined text-[18px]">search</span>GET /rag/search
+      </button>
+    </form>
+    <div id="rag-hits" class="flex flex-col gap-2"></div>
+  </div>
+
+  <div class="bg-surface-container-lowest p-space-lg rounded shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+    <div>
+      <h2 class="font-headline-sm font-bold">Reindexar corpus</h2>
+      <p class="font-body-sm text-on-surface-variant mt-1">POST /rag/index/lei-14133 — Lei + seed TCU</p>
+    </div>
+    <button id="btn-index" type="button" class="flex items-center gap-2 px-4 py-2 rounded bg-primary text-on-primary font-label-md font-semibold">
+      <span class="material-symbols-outlined text-[18px]">database</span>Indexar Lei 14.133
+    </button>
+  </div>
+  <pre id="index-result" class="hidden bg-surface-container-low p-space-sm rounded font-data-mono text-[11px] overflow-auto"></pre>
+
+  <p class="font-label-sm text-[11px] text-outline text-center">
+    Impugnação: 3 dias úteis antes da abertura (Art. 164). Peças com disclaimer OAB (Lei 8.906/1994).
+  </p>
+</div>
+</div>
+<script>
+  LicitAllShell.mount({
+    active: "rag-lei-14133",
+    onReady() {
+      document.getElementById("rag-search-form").addEventListener("submit", async (ev) => {
+        ev.preventDefault();
+        const q = document.getElementById("rag-q").value.trim();
+        const top_k = document.getElementById("rag-top-k").value || 5;
+        const box = document.getElementById("rag-hits");
+        box.innerHTML = `<p class="text-outline animate-pulse">Buscando…</p>`;
+        try {
+          const res = await fetch(`/rag/search?q=${encodeURIComponent(q)}&top_k=${top_k}`);
+          const data = await res.json();
+          const hits = data.results || [];
+          if (!hits.length) {
+            box.innerHTML = `<p class="text-outline">Nenhum resultado.</p>`;
+            return;
+          }
+          box.innerHTML = hits.map((h) => `
+            <article class="p-space-sm rounded bg-surface-container-low border-l-4 border-secondary">
+              <div class="flex justify-between gap-2 mb-1">
+                <span class="font-data-mono text-[10px] font-bold text-secondary">${h.source || "lei_14133"} · ${h.chunk_id || ""}</span>
+                <span class="font-data-mono text-[10px] text-outline">${(h.score ?? 0).toFixed(4)}</span>
+              </div>
+              <h3 class="font-label-md font-bold">${h.titulo || h.fundamentacao || "Trecho legal"}</h3>
+              <p class="mt-1 font-body-sm text-on-surface-variant">${h.texto || ""}</p>
+            </article>`).join("");
+        } catch {
+          box.innerHTML = `<p class="text-error">Falha na busca RAG.</p>`;
+        }
+      });
+
+      document.getElementById("btn-index").addEventListener("click", async () => {
+        const pre = document.getElementById("index-result");
+        pre.classList.remove("hidden");
+        pre.textContent = "Indexando…";
+        try {
+          const res = await fetch("/rag/index/lei-14133", { method: "POST" });
+          const data = await res.json();
+          pre.textContent = JSON.stringify(data, null, 2);
+        } catch (e) {
+          pre.textContent = e.message || "Erro";
+        }
+      });
+    },
+  });
+</script>
+</body>
+</html>

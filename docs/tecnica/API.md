@@ -3,13 +3,52 @@
 Base local: `http://localhost:8000`  
 OpenAPI: `/docs`
 
+## UI web
+
+Base: `http://localhost:8000/ui/` · Login: `/ui/login.html` · Dashboard: `/ui/dashboard.html`  
+Doc: [INTERFACE_WEB.md](../usuario/INTERFACE_WEB.md)
+
+## `GET /tenders`
+
+Lista editais reais de `tender_ingest`.
+
+Query: `uf`, `status`, `q` (busca textual), `limit` (máx. 200), `offset`.
+
+Resposta: `{ total, limit, offset, items[] }` — cada item inclui `art164` (prazo calculado Art. 164).
+
+## `GET /tenders/stats`
+
+KPIs: `total`, `valor_total_estimado_sum`, `by_status`, `by_uf`, `prazos_criticos` (≤ 3 dias úteis).
+
+## `GET /tenders/{id_pncp}`
+
+Detalhe + `filesystem` (docs/parsed/kit em `data/raw`).
+
 ## `GET /health`
 
 Retorna status, versão e paths/URLs configurados.
 
+## `POST /ingestion/pncp/sync/async`
+
+Sync **assíncrono**. Padrão **`uf=BR`** (Brasil): percorre as 27 UFs uma a uma (a API nacional sem UF estoura timeout).  
+**Commit a cada página** → `GET /tenders` já lista editais enquanto o job roda.
+
+```json
+{ "uf": "BR", "only_open": true }
+```
+
+Ou uma UF: `{ "uf": "SP" }`. Janela máx. 7 dias.
+
+## `GET /ingestion/pncp/sync/jobs/{job_id}`
+
+Status do job: `queued | running | succeeded | partial | failed`, `ingested`, `pages_done`, `log[]`.
+
+UI (dashboard/monitor) usa este fluxo com polling.
+
 ## `POST /ingestion/pncp/sync`
 
-Sincroniza publicações do PNCP e faz upsert em `tender_ingest`.
+Sincroniza publicações do PNCP e faz upsert em `tender_ingest` (**síncrono / legado**).  
+**UF obrigatória.** Prefira `/sync/async`.
 
 Body (JSON), todos opcionais:
 

@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LicitAll — Configurações</title>
+  <link rel="icon" href="/ui/assets/logo.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet">
+  <link href="/ui/assets/app.css" rel="stylesheet">
+  <script src="/ui/assets/tailwind-theme.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwind.config = window.__LICITALL_TW__;</script>
+  <script src="/ui/assets/auth.js"></script>
+  <script src="/ui/assets/shell.js"></script>
+</head>
+<body class="bg-background font-body-md text-body-md text-on-surface">
+<div id="app-root">
+<div data-page class="flex flex-col w-full gap-space-lg max-w-4xl">
+  <div class="bg-surface-container-lowest p-space-lg rounded shadow-sm flex items-start gap-3">
+    <span class="material-symbols-outlined text-secondary text-[32px]">settings</span>
+    <div>
+      <h1 class="font-headline-lg text-headline-lg tracking-tight">Configurações</h1>
+      <p class="font-body-sm text-on-surface-variant mt-1">Variáveis de ambiente expostas via GET /health (somente leitura).</p>
+    </div>
+  </div>
+
+  <div id="config-grid" class="grid grid-cols-1 sm:grid-cols-2 gap-space-md">
+    <div class="col-span-full p-space-md rounded bg-surface-container-low text-on-surface-variant text-center">Carregando /health…</div>
+  </div>
+
+  <div class="bg-surface-container-lowest p-space-lg rounded shadow-sm">
+    <h2 class="font-headline-sm font-bold mb-3">Referência .env</h2>
+    <pre class="font-data-mono text-[11px] text-on-surface-variant bg-surface-container-low p-space-sm rounded overflow-x-auto"># Exemplos (configure no backend)
+DATABASE_URL=postgresql+asyncpg://...
+REDIS_URL=redis://localhost:6379
+MINHA_RECEITA_BASE_URL=https://minhareceita.org
+EVOLUTION_API_URL=http://localhost:8080
+EVOLUTION_INSTANCE=licitall
+RAW_DOCS_PATH=data/raw</pre>
+  </div>
+
+  <div class="flex flex-wrap gap-3">
+    <a href="/ui/logs.html" class="flex items-center gap-2 px-4 py-2 rounded bg-secondary text-on-secondary font-label-md font-semibold">
+      <span class="material-symbols-outlined text-[18px]">terminal</span>Ver logs / deps
+    </a>
+    <a href="/docs" target="_blank" rel="noopener" class="flex items-center gap-2 px-4 py-2 rounded bg-surface-container text-on-surface font-label-md">
+      <span class="material-symbols-outlined text-[18px]">api</span>OpenAPI
+    </a>
+  </div>
+
+  <p class="font-label-sm text-[11px] text-outline">
+    Fase 6 — integração operacional. Compliance: Lei 14.133/2021 · OAB 8.906/1994.
+  </p>
+</div>
+</div>
+<script>
+  LicitAllShell.mount({
+    active: "configuracoes",
+    onReady() {
+      fetch("/health")
+        .then((r) => r.json())
+        .then((h) => {
+          const items = [
+            { label: "API Status", value: h.status, icon: "api" },
+            { label: "Versão", value: h.version, icon: "info" },
+            { label: "Fase", value: h.fase, icon: "flag" },
+            { label: "Marco legal", value: h.marco_legal, icon: "gavel" },
+            { label: "Minha Receita URL", value: h.minha_receita, icon: "business" },
+            { label: "Evolution API URL", value: h.evolution_api, icon: "chat" },
+            { label: "Evolution Instance", value: h.evolution_instance, icon: "smartphone" },
+            { label: "Docling disponível", value: h.docling_available ? "Sim" : "Não", icon: "document_scanner" },
+            { label: "Chunks legais", value: String(h.legal_chunks ?? "—"), icon: "menu_book" },
+            { label: "Diretório raw docs", value: h.raw_docs_dir, icon: "folder" },
+          ];
+          document.getElementById("config-grid").innerHTML = items.map((i) => `
+            <div class="bg-surface-container-lowest p-space-md rounded shadow-sm">
+              <div class="flex items-center gap-2 mb-2">
+                <span class="material-symbols-outlined text-secondary text-[20px]">${i.icon}</span>
+                <span class="font-label-sm uppercase tracking-wider text-outline font-bold">${i.label}</span>
+              </div>
+              <div class="font-data-mono text-[12px] text-on-surface break-all">${i.value ?? "—"}</div>
+            </div>`).join("");
+        })
+        .catch(() => {
+          document.getElementById("config-grid").innerHTML =
+            `<div class="col-span-full p-space-md rounded bg-error-container text-on-error-container text-center">Não foi possível carregar /health — inicie uvicorn em :8000</div>`;
+        });
+    },
+  });
+</script>
+</body>
+</html>

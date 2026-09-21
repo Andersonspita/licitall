@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LicitAll — Peças & Minutas</title>
+  <link rel="icon" href="/ui/assets/logo.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet">
+  <link href="/ui/assets/app.css" rel="stylesheet">
+  <script src="/ui/assets/tailwind-theme.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwind.config = window.__LICITALL_TW__;</script>
+  <script src="/ui/assets/auth.js"></script>
+  <script src="/ui/assets/api.js"></script>
+  <script src="/ui/assets/shell.js"></script>
+</head>
+<body class="bg-background font-body-md text-body-md text-on-surface">
+<div id="app-root">
+<div data-page class="flex flex-col w-full gap-space-md">
+
+  <!-- Contextual Top Bar -->
+  <header class="bg-surface-container-lowest p-space-lg rounded shadow-sm flex flex-col xl:flex-row xl:items-center justify-between gap-space-md">
+    <div class="flex items-start gap-3">
+      <span class="material-symbols-outlined text-secondary text-[36px] shrink-0">policy</span>
+      <div>
+        <div class="flex flex-wrap items-center gap-2 mb-1">
+          <h1 class="font-headline-lg text-headline-lg tracking-tight">Hub Jurídico & Minutas</h1>
+          <span class="px-2 py-0.5 rounded bg-secondary-fixed text-on-secondary-fixed font-label-sm font-bold">Lei 14.133/2021</span>
+        </div>
+        <p data-peca-subtitle class="font-body-sm text-body-sm text-on-surface-variant">
+          Selecione um edital real (?id=) a partir de Editais & TRs. Minutas com disclaimer OAB (Lei 8.906/1994).
+        </p>
+      </div>
+    </div>
+    <div class="flex flex-wrap items-center gap-2">
+      <div class="flex items-center gap-2 px-3 py-2 rounded bg-error-container text-on-error-container font-label-md font-bold shadow-sm">
+        <span class="material-symbols-outlined text-[20px]">timer</span>
+        <span>Art. 164: <span id="countdown">2</span> dias úteis</span>
+      </div>
+      <button id="btn-export" type="button" class="flex items-center gap-1.5 px-3 py-2 rounded bg-surface-container text-on-surface font-label-md font-semibold hover:bg-surface-container-high transition-colors">
+        <span class="material-symbols-outlined text-[18px]">download</span>Exportar
+      </button>
+      <button id="btn-validar-oab" type="button" class="flex items-center gap-1.5 px-3 py-2 rounded bg-secondary-container text-on-secondary-container font-label-md font-semibold hover:opacity-90 transition-opacity">
+        <span class="material-symbols-outlined text-[18px]">verified</span>Validar OAB
+      </button>
+      <a href="/ui/whatsapp.html" class="flex items-center gap-1.5 px-3 py-2 rounded bg-tertiary-fixed text-on-tertiary-fixed font-label-md font-semibold shadow-sm hover:opacity-90 transition-opacity">
+        <span class="material-symbols-outlined text-[18px]">chat</span>WhatsApp
+      </a>
+      <button id="btn-nova-peca" type="button" class="flex items-center gap-1.5 px-3 py-2 rounded bg-secondary text-on-secondary font-label-md font-semibold shadow-sm hover:bg-secondary-container hover:text-on-secondary-container transition-colors">
+        <span class="material-symbols-outlined text-[18px]">add</span>Nova peça
+      </button>
+    </div>
+  </header>
+
+  <!-- Mandatory OAB Banner -->
+  <section class="p-space-md rounded bg-surface-container-high border-2 border-secondary/30 flex flex-col lg:flex-row lg:items-start gap-space-md">
+    <span class="material-symbols-outlined text-secondary text-[32px] shrink-0">gavel</span>
+    <div class="flex-1 flex flex-col gap-space-sm">
+      <div class="font-headline-sm text-headline-sm font-bold text-on-surface">Compliance obrigatório — Lei 8.906/1994 (OAB)</div>
+      <p class="font-body-sm text-body-sm text-on-surface-variant leading-relaxed">
+        Minutas geradas por IA são <strong class="text-on-surface">suporte técnico preliminar</strong>.
+        Revisão, assinatura, registro e protocolo são de responsabilidade exclusiva de advogado habilitado.
+        Não constitui parecer jurídico vinculante. Marco licitatório: Lei Federal nº 14.133/2021.
+      </p>
+      <label class="flex items-center gap-2 font-label-md font-semibold cursor-pointer">
+        <input id="oab-ack" type="checkbox" class="w-5 h-5 accent-secondary">
+        Li, compreendo e aceito o aviso OAB — autorizo geração de minuta de suporte
+      </label>
+    </div>
+    <div class="lg:w-64 shrink-0 p-space-sm rounded bg-surface-container-lowest border border-surface-container">
+      <span class="font-label-sm text-label-sm uppercase tracking-wider text-outline font-bold">Assinatura advogado(a)</span>
+      <div class="mt-2 flex flex-col gap-2">
+        <input id="oab-nome" type="text" placeholder="Nome completo · OAB/UF nº"
+          class="w-full rounded bg-surface-container-low px-2 py-1.5 font-body-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-secondary">
+        <input id="oab-data" type="date" value="2026-09-21"
+          class="w-full rounded bg-surface-container-low px-2 py-1.5 font-body-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-secondary">
+        <div class="h-12 rounded border-2 border-dashed border-outline/40 flex items-center justify-center font-label-sm text-outline">
+          Área de assinatura digital
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3 Columns -->
+  <div class="grid grid-cols-1 xl:grid-cols-12 gap-space-md items-start">
+
+    <!-- LEFT: Typology + Versions + Inconformidade -->
+    <aside class="xl:col-span-3 flex flex-col gap-space-md">
+
+      <div class="bg-surface-container-lowest rounded shadow-sm overflow-hidden">
+        <div class="p-space-sm bg-surface-container-low font-label-sm uppercase tracking-wider text-outline font-bold">Tipologia de peças</div>
+        <div class="p-space-sm flex flex-col gap-1">
+          <button type="button" data-piece="impugnacao" class="piece-btn flex items-center gap-2 px-3 py-2.5 rounded bg-secondary-container text-on-secondary-container font-label-md font-semibold shadow-sm">
+            <span class="material-symbols-outlined text-[18px]">report</span>Impugnação ao Edital
+          </button>
+          <button type="button" data-piece="esclarecimento" class="piece-btn flex items-center gap-2 px-3 py-2 rounded text-on-surface-variant hover:bg-surface-container font-label-md">
+            <span class="material-symbols-outlined text-[18px]">help</span>Pedido de Esclarecimento
+          </button>
+          <button type="button" data-piece="proposta" class="piece-btn flex items-center gap-2 px-3 py-2 rounded text-on-surface-variant hover:bg-surface-container font-label-md">
+            <span class="material-symbols-outlined text-[18px]">description</span>Proposta Comercial
+          </button>
+          <button type="button" data-piece="declaracoes" class="piece-btn flex items-center gap-2 px-3 py-2 rounded text-on-surface-variant hover:bg-surface-container font-label-md">
+            <span class="material-symbols-outlined text-[18px]">fact_check</span>Declarações ME/EPP
+          </button>
+          <button type="button" data-piece="recurso" class="piece-btn flex items-center gap-2 px-3 py-2 rounded text-on-surface-variant hover:bg-surface-container font-label-md">
+            <span class="material-symbols-outlined text-[18px]">balance</span>Recurso Administrativo
+          </button>
+        </div>
+      </div>
+
+      <div class="bg-surface-container-lowest rounded shadow-sm overflow-hidden">
+        <div class="p-space-sm bg-surface-container-low font-label-sm uppercase tracking-wider text-outline font-bold flex items-center justify-between">
+          <span>Versões da minuta</span>
+          <span class="font-data-mono text-[10px] text-secondary">v3 ativa</span>
+        </div>
+        <ul class="divide-y divide-surface-container font-label-sm">
+          <li class="px-space-sm py-2.5 flex items-center justify-between bg-secondary-container/10 cursor-pointer">
+            <div>
+              <span class="font-semibold text-on-secondary-container">v3 · Rascunho IA</span>
+              <span class="block font-data-mono text-[10px] text-outline">21/09/2026 14:22 · operador</span>
+            </div>
+            <span class="px-1.5 py-0.5 rounded bg-tertiary-fixed text-on-tertiary-fixed font-data-mono text-[9px] font-bold">ATIVA</span>
+          </li>
+          <li class="px-space-sm py-2.5 flex items-center justify-between hover:bg-surface-container-low cursor-pointer">
+            <div>
+              <span class="font-semibold">v2 · Revisão advogado</span>
+              <span class="block font-data-mono text-[10px] text-outline">20/09/2026 18:45 · Dra. Silva OAB/DF</span>
+            </div>
+            <span class="px-1.5 py-0.5 rounded bg-surface-container text-outline font-data-mono text-[9px]">ARQ</span>
+          </li>
+          <li class="px-space-sm py-2.5 flex items-center justify-between hover:bg-surface-container-low cursor-pointer">
+            <div>
+              <span class="font-semibold">v1 · Geração inicial</span>
+              <span class="block font-data-mono text-[10px] text-outline">20/09/2026 09:12 · POST /advisory/generate</span>
+            </div>
+            <span class="px-1.5 py-0.5 rounded bg-surface-container text-outline font-data-mono text-[9px]">ARQ</span>
+          </li>
+        </ul>
+      </div>
+
+      <div class="bg-surface-container-lowest rounded shadow-sm p-space-md border-l-4 border-error">
+        <div class="flex items-center gap-2 mb-2">
+          <span class="material-symbols-outlined text-error text-[22px]">error</span>
+          <h2 class="font-headline-sm text-headline-sm font-bold text-error">Inconformidade detectada</h2>
+        </div>
+        <div class="flex flex-col gap-2 font-label-sm">
+          <div class="p-2 rounded bg-error-container/40">
+            <span class="font-data-mono text-[10px] font-bold text-error">CL. 7.3.2 · ALTA</span>
+            <p class="mt-1 text-on-error-container">Certificação exclusiva XYZ Platinum — veda equivalência técnica. Restrição à competitividade (Art. 41).</p>
+          </div>
+          <div class="p-2 rounded bg-secondary-fixed/20">
+            <span class="font-data-mono text-[10px] font-bold text-secondary">CL. 6.4.1 · MÉDIA</span>
+            <p class="mt-1 text-on-surface-variant">Exigência de faturamento 3× acima do porte ME — verificar LC 123/2006.</p>
+          </div>
+        </div>
+        <a href="/ui/edital.html" class="mt-2 inline-flex items-center gap-1 font-label-sm text-secondary font-bold hover:underline">
+          <span class="material-symbols-outlined text-[14px]">open_in_new</span>Ver no explorador
+        </a>
+      </div>
+    </aside>
+
+    <!-- CENTER: Paper Draft -->
+    <section class="xl:col-span-5 la-paper rounded shadow-sm flex flex-col min-h-[600px]">
+      <div class="p-space-md bg-surface-container-low border-b border-surface-container flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+        <div>
+          <span class="font-label-sm text-label-sm text-outline uppercase tracking-wider">Minuta — Impugnação ao Edital</span>
+          <h2 class="font-headline-sm text-headline-sm font-bold mt-0.5">Edital selecionado via ?id=</h2>
+        </div>
+        <div class="flex items-center gap-1">
+          <button type="button" class="toolbar-btn p-1.5 rounded hover:bg-surface-container-high" title="Negrito" data-cmd="bold"><span class="material-symbols-outlined text-[18px]">format_bold</span></button>
+          <button type="button" class="toolbar-btn p-1.5 rounded hover:bg-surface-container-high" title="Itálico" data-cmd="italic"><span class="material-symbols-outlined text-[18px]">format_italic</span></button>
+          <button type="button" class="toolbar-btn p-1.5 rounded hover:bg-surface-container-high" title="Lista" data-cmd="insertUnorderedList"><span class="material-symbols-outlined text-[18px]">format_list_bulleted</span></button>
+          <button type="button" class="toolbar-btn p-1.5 rounded hover:bg-surface-container-high" title="Citação legal" data-cmd="insertText"><span class="material-symbols-outlined text-[18px]">gavel</span></button>
+          <span class="font-data-mono text-[10px] text-outline ml-2 px-2 py-0.5 rounded bg-surface-container">DRAFT · IA</span>
+        </div>
+      </div>
+      <div id="draft-editor" contenteditable="true" class="flex-1 p-space-lg font-body-sm leading-relaxed text-on-surface outline-none overflow-y-auto max-h-[520px]" spellcheck="false">
+<p class="text-on-surface-variant"><em>Editor vazio. Abra com <code>?id=</code> de um edital real, aceite o aviso OAB e clique em <strong>Gerar kit via API</strong>. O sistema não inventa cláusulas — a minuta sai do extract/RAG do edital selecionado.</em></p>
+<p style="margin-top:1.5em;padding:0.75em;border:1px dashed #8a8171;font-size:11px;color:#5c5548;"><strong>DISCLAIMER OAB (Lei 8.906/1994):</strong> Minuta gerada com suporte de inteligência artificial. Subsídio técnico preliminar — revisão, assinatura e protocolo são de responsabilidade do advogado habilitado.</p>
+      </div>
+      <div class="p-space-md border-t border-surface-container flex flex-wrap gap-2">
+        <button id="btn-generate" type="button" class="flex items-center gap-2 px-4 py-2 rounded bg-secondary text-on-secondary font-label-md font-semibold shadow-sm hover:opacity-90 transition-opacity">
+          <span class="material-symbols-outlined text-[18px]">auto_awesome</span>Gerar kit via API
+        </button>
+        <button type="button" onclick="window.print()" class="flex items-center gap-2 px-4 py-2 rounded bg-surface-container text-on-surface font-label-md hover:bg-surface-container-high">
+          <span class="material-symbols-outlined text-[18px]">print</span>Imprimir
+        </button>
+        <button id="btn-save-draft" type="button" class="flex items-center gap-2 px-4 py-2 rounded bg-surface-container text-on-surface font-label-md hover:bg-surface-container-high">
+          <span class="material-symbols-outlined text-[18px]">save</span>Salvar rascunho
+        </button>
+      </div>
+    </section>
+
+    <!-- RIGHT: RAG + Admissibility + WhatsApp -->
+    <aside class="xl:col-span-4 flex flex-col gap-space-md">
+
+      <div class="bg-surface-container-lowest rounded shadow-sm p-space-md">
+        <div class="flex items-center justify-between mb-3">
+          <div class="flex items-center gap-2">
+            <span class="material-symbols-outlined text-secondary text-[22px]">menu_book</span>
+            <h2 class="font-headline-sm text-headline-sm font-bold">Teses RAG vinculadas</h2>
+          </div>
+          <button id="btn-rag-precedents" type="button" class="p-1.5 rounded hover:bg-surface-container-low" title="Atualizar">
+            <span class="material-symbols-outlined text-[18px]">refresh</span>
+          </button>
+        </div>
+        <div id="precedents" class="flex flex-col gap-2 font-label-sm max-h-52 overflow-y-auto">
+          <div class="p-2.5 rounded bg-surface-container-low border-l-2 border-secondary">
+            <span class="font-data-mono text-[10px] text-secondary font-bold">Art. 41 · Lei 14.133/2021</span>
+            <p class="mt-1 text-[11px] leading-snug text-on-surface-variant">Princípio da isonomia — vedação a preferências ou distinções injustificadas entre licitantes. Fundamento principal da impugnação.</p>
+            <span class="inline-block mt-1 px-1 py-0.5 rounded bg-tertiary-fixed/20 font-data-mono text-[9px] text-secondary">score 0.942</span>
+          </div>
+          <div class="p-2.5 rounded bg-surface-container-low border-l-2 border-secondary">
+            <span class="font-data-mono text-[10px] text-secondary font-bold">Art. 40, §1º · Lei 14.133</span>
+            <p class="mt-1 text-[11px] leading-snug text-on-surface-variant">Vedação a referências a marcas/fabricantes salvo justificativa de impossibilidade de descrição alternativa.</p>
+            <span class="inline-block mt-1 px-1 py-0.5 rounded bg-tertiary-fixed/20 font-data-mono text-[9px] text-secondary">score 0.891</span>
+          </div>
+          <div class="p-2.5 rounded bg-surface-container-low border-l-2 border-error">
+            <span class="font-data-mono text-[10px] text-error font-bold">TCU · Acórdão seed 2024</span>
+            <p class="mt-1 text-[11px] leading-snug text-on-surface-variant">Certificação de fabricante único sem equivalência técnica — irregularidade manifesta. Precedente indexado pgvector.</p>
+            <span class="inline-block mt-1 px-1 py-0.5 rounded bg-error-container/30 font-data-mono text-[9px] text-error">score 0.876</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-surface-container-lowest rounded shadow-sm p-space-md">
+        <div class="flex items-center gap-2 mb-3">
+          <span class="material-symbols-outlined text-secondary text-[22px]">fact_check</span>
+          <h2 class="font-headline-sm text-headline-sm font-bold">Checklist de admissibilidade</h2>
+        </div>
+        <ul class="flex flex-col gap-2 font-label-sm">
+          <li class="flex items-center gap-2 p-2 rounded bg-tertiary-fixed/10">
+            <span class="material-symbols-outlined text-on-tertiary-container text-[18px]">check_circle</span>
+            <div><span class="font-semibold">Tempestividade Art. 164</span><span class="block text-[11px] text-on-surface-variant">2 dias úteis restantes · OK</span></div>
+          </li>
+          <li class="flex items-center gap-2 p-2 rounded bg-tertiary-fixed/10">
+            <span class="material-symbols-outlined text-on-tertiary-container text-[18px]">check_circle</span>
+            <div><span class="font-semibold">Legitimidade ativa</span><span class="block text-[11px] text-on-surface-variant">Qualquer interessado · Art. 164, §1º</span></div>
+          </li>
+          <li class="flex items-center gap-2 p-2 rounded bg-secondary-fixed/20">
+            <span class="material-symbols-outlined text-secondary text-[18px]">pending</span>
+            <div><span class="font-semibold">Fundamentação jurídica</span><span class="block text-[11px] text-on-surface-variant">3 teses RAG vinculadas · revisar</span></div>
+          </li>
+          <li class="flex items-center gap-2 p-2 rounded bg-error-container/30">
+            <span class="material-symbols-outlined text-error text-[18px]">error</span>
+            <div><span class="font-semibold text-error">Assinatura OAB</span><span class="block text-[11px] text-on-error-container">Pendente — preencher box de assinatura</span></div>
+          </li>
+          <li class="flex items-center gap-2 p-2 rounded hover:bg-surface-container-low">
+            <span class="material-symbols-outlined text-outline text-[18px]">radio_button_unchecked</span>
+            <div><span>Procuração / contrato social</span><span class="block text-[11px] text-on-surface-variant">Anexar Doc. 01</span></div>
+          </li>
+        </ul>
+      </div>
+
+      <div class="bg-surface-container-lowest rounded shadow-sm overflow-hidden">
+        <div class="p-space-md bg-surface-container-low flex items-center gap-2">
+          <span class="material-symbols-outlined text-on-tertiary-container text-[22px]">send</span>
+          <div>
+            <h2 class="font-headline-sm text-headline-sm font-bold">Kit Evolution — Disparo</h2>
+            <span class="font-label-sm text-label-sm text-outline">WhatsApp digest pós-minuta</span>
+          </div>
+        </div>
+        <div class="p-space-md flex flex-col gap-space-sm">
+          <label class="flex flex-col gap-1">
+            <span class="font-label-sm font-semibold text-on-surface-variant">Destinatário</span>
+            <input type="tel" value="+55 61 99876-4521" class="rounded bg-surface-container-low px-3 py-2 font-data-mono text-body-sm focus:outline-none focus:ring-2 focus:ring-secondary">
+          </label>
+          <label class="flex flex-col gap-1">
+            <span class="font-label-sm font-semibold text-on-surface-variant">Preview da mensagem</span>
+            <textarea rows="4" readonly class="rounded bg-surface-container-low px-3 py-2 font-body-sm text-on-surface-variant resize-none">Preview WhatsApp será montado a partir do edital real e do kit gerado. Use a tela Disparos WhatsApp.</textarea>
+          </label>
+          <div class="flex gap-2">
+            <a href="/ui/whatsapp.html" class="flex-1 flex items-center justify-center gap-2 py-2 rounded bg-primary text-on-primary font-label-md font-semibold shadow-sm hover:opacity-90">
+              <span class="material-symbols-outlined text-[18px]">open_in_new</span>Central WhatsApp
+            </a>
+            <button type="button" id="btn-wa-preview" class="px-3 py-2 rounded bg-tertiary-fixed text-on-tertiary-fixed font-label-md font-semibold hover:opacity-90">
+              Preview API
+            </button>
+          </div>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <!-- Audit Trail Footer -->
+  <footer class="bg-surface-container-lowest rounded shadow-sm overflow-hidden">
+    <div class="p-space-sm bg-surface-container-low font-label-sm uppercase tracking-wider text-outline font-bold flex items-center gap-2">
+      <span class="material-symbols-outlined text-[18px]">history</span>Trilha de auditoria
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-left font-label-sm min-w-[640px]">
+        <thead>
+          <tr class="bg-surface-container text-on-surface-variant font-label-md uppercase tracking-wider">
+            <th class="px-4 py-2">Timestamp</th>
+            <th class="px-4 py-2">Evento</th>
+            <th class="px-4 py-2">Ator</th>
+            <th class="px-4 py-2">Detalhe</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-surface-container font-data-mono text-[11px]">
+          <tr class="hover:bg-surface-container-low">
+            <td class="px-4 py-2 text-outline">2026-09-21 14:22:08</td>
+            <td class="px-4 py-2"><span class="px-1.5 py-0.5 rounded bg-secondary-container text-on-secondary-container font-bold">EDIT</span></td>
+            <td class="px-4 py-2">operador@licitall</td>
+            <td class="px-4 py-2">Minuta v3 — revisão manual cl. pedidos</td>
+          </tr>
+          <tr class="hover:bg-surface-container-low">
+            <td class="px-4 py-2 text-outline">2026-09-20 18:45:33</td>
+            <td class="px-4 py-2"><span class="px-1.5 py-0.5 rounded bg-tertiary-fixed text-on-tertiary-fixed font-bold">OAB</span></td>
+            <td class="px-4 py-2">Dra. Silva · OAB/DF 32.109</td>
+            <td class="px-4 py-2">Validação jurídica v2 — aprovada com ressalvas</td>
+          </tr>
+          <tr class="hover:bg-surface-container-low">
+            <td class="px-4 py-2 text-outline">2026-09-20 09:12:41</td>
+            <td class="px-4 py-2"><span class="px-1.5 py-0.5 rounded bg-secondary text-on-secondary font-bold">GEN</span></td>
+            <td class="px-4 py-2">POST /advisory/generate</td>
+            <td class="px-4 py-2">Ações do kit aparecem aqui após gerar via API (sem histórico mock).</td>
+          </tr>
+          <tr class="hover:bg-surface-container-low">
+            <td class="px-4 py-2 text-outline">2026-09-20 08:55:17</td>
+            <td class="px-4 py-2"><span class="px-1.5 py-0.5 rounded bg-surface-container text-outline font-bold">RAG</span></td>
+            <td class="px-4 py-2">GET /rag/search</td>
+            <td class="px-4 py-2">3 teses vinculadas · certificação exclusiva isonomia</td>
+          </tr>
+          <tr class="hover:bg-surface-container-low">
+            <td class="px-4 py-2 text-outline">2026-09-19 16:30:02</td>
+            <td class="px-4 py-2"><span class="px-1.5 py-0.5 rounded bg-error-container text-on-error-container font-bold">ALERT</span></td>
+            <td class="px-4 py-2">LangGraph extract</td>
+            <td class="px-4 py-2">Risco cl. 7.3.2 detectado · severidade ALTA</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="p-space-sm bg-surface-container-low border-t border-surface-container font-label-sm text-[11px] text-outline text-center">
+      Lei 8.906/1994 · Lei 14.133/2021 · Registro imutável local (protótipo Fase 6)
+    </div>
+  </footer>
+</div>
+</div>
+
+<!-- Modal generated kit -->
+<div id="kit-modal" class="hidden fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40">
+  <div class="bg-surface-container-lowest rounded-xl shadow-lg max-w-3xl w-full max-h-[80vh] flex flex-col">
+    <div class="p-space-md border-b border-surface-container flex items-center justify-between">
+      <h3 class="font-headline-sm text-headline-sm font-bold">Kit gerado — POST /advisory/generate</h3>
+      <button id="kit-close" type="button" class="p-1 rounded hover:bg-surface-container"><span class="material-symbols-outlined">close</span></button>
+    </div>
+    <pre id="kit-output" class="p-space-md overflow-auto flex-1 font-data-mono text-[11px] text-on-surface-variant bg-surface-container-low m-space-md rounded"></pre>
+    <div class="p-space-md border-t border-surface-container flex justify-end gap-2">
+      <button id="kit-apply" type="button" class="px-4 py-2 rounded bg-secondary text-on-secondary font-label-md font-semibold">Aplicar ao editor</button>
+      <button id="kit-close-2" type="button" class="px-4 py-2 rounded bg-surface-container text-on-surface font-label-md">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  let currentTender = null;
+
+  function esc(s) {
+    return String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+
+  function applyTenderHeader(t) {
+    currentTender = t;
+    const subtitle = document.querySelector("[data-peca-subtitle]");
+    if (subtitle) {
+      subtitle.textContent = `${t.id_pncp} · ${t.orgao_comprador || "—"} · ${LicitAllApi.formatBRL(t.valor_total_estimado)}`;
+    }
+    const draft = document.getElementById("draft-editor");
+    if (draft && !draft.dataset.touched) {
+      draft.innerHTML = `<p class="text-on-surface-variant"><em>Edital carregado: <strong>${esc(t.id_pncp)}</strong>. Aceite o aviso OAB e clique em Gerar kit para preencher a minuta com dados reais (API). Não invente cláusulas.</em></p>`;
+    }
+  }
+
+  LicitAllShell.mount({
+    active: "pecas-minutas",
+    async onReady() {
+      const id = new URLSearchParams(location.search).get("id");
+      if (id) {
+        try {
+          applyTenderHeader(await LicitAllApi.getTender(id));
+        } catch (err) {
+          alert("Edital não encontrado: " + err.message);
+        }
+      }
+
+      document.getElementById("draft-editor")?.addEventListener("input", () => {
+        document.getElementById("draft-editor").dataset.touched = "1";
+      });
+
+      document.querySelectorAll(".piece-btn").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          document.querySelectorAll(".piece-btn").forEach((b) => {
+            b.className = "piece-btn flex items-center gap-2 px-3 py-2 rounded text-on-surface-variant hover:bg-surface-container font-label-md";
+          });
+          btn.className = "piece-btn flex items-center gap-2 px-3 py-2.5 rounded bg-secondary-container text-on-secondary-container font-label-md font-semibold shadow-sm";
+        });
+      });
+
+      document.querySelectorAll(".toolbar-btn").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const cmd = btn.dataset.cmd;
+          if (cmd === "insertText") {
+            document.execCommand("insertText", false, "Art. 164, Lei 14.133/2021 — ");
+          } else if (cmd) {
+            document.execCommand(cmd, false, null);
+          }
+          document.getElementById("draft-editor")?.focus();
+        });
+      });
+
+      document.getElementById("btn-export")?.addEventListener("click", () => {
+        const html = document.getElementById("draft-editor")?.innerHTML || "";
+        const blob = new Blob([`<!DOCTYPE html><html><body>${html}</body></html>`], { type: "text/html" });
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = "minuta-" + (currentTender?.id_pncp || "rascunho").replace(/[^\w.-]+/g, "_") + ".html";
+        a.click();
+        URL.revokeObjectURL(a.href);
+      });
+
+      document.getElementById("btn-validar-oab")?.addEventListener("click", () => {
+        const ack = document.getElementById("oab-ack")?.checked;
+        const nome = document.getElementById("oab-nome")?.value.trim();
+        if (!ack) { alert("Aceite o aviso OAB antes de validar."); return; }
+        if (!nome) { alert("Preencha nome e OAB/UF."); return; }
+        alert(`Ciência OAB registrada para ${nome}. Persistência de assinatura ainda não implementada.`);
+      });
+
+      document.getElementById("btn-nova-peca")?.addEventListener("click", () => {
+        document.getElementById("draft-editor").innerHTML = "<p><em>Nova peça — gere via API a partir do edital selecionado.</em></p>";
+        delete document.getElementById("draft-editor").dataset.touched;
+      });
+
+      document.getElementById("btn-wa-preview")?.addEventListener("click", () => {
+        const q = currentTender?.id_pncp ? ("?id=" + encodeURIComponent(currentTender.id_pncp)) : "";
+        location.href = "/ui/whatsapp.html" + q;
+      });
+
+      document.getElementById("btn-rag-precedents")?.addEventListener("click", async () => {
+        const box = document.getElementById("precedents");
+        box.innerHTML = `<p class="text-outline animate-pulse text-[11px]">Atualizando GET /rag/search…</p>`;
+        try {
+          const res = await fetch("/rag/search?q=impugnação+edital+competitividade+Art+164&top_k=3");
+          const data = await res.json();
+          box.innerHTML = (data.results || []).map((h) => `
+            <div class="p-2.5 rounded bg-surface-container-low border-l-2 border-secondary">
+              <span class="font-data-mono text-[10px] text-secondary font-bold">${esc(h.titulo || h.source || "Trecho")}</span>
+              <p class="mt-1 text-[11px] leading-snug text-on-surface-variant">${esc(h.texto || "")}</p>
+            </div>`).join("") || `<p class="text-outline text-[11px]">Sem resultados.</p>`;
+        } catch {
+          box.innerHTML = `<p class="text-error text-[11px]">RAG indisponível</p>`;
+        }
+      });
+
+      document.getElementById("btn-generate")?.addEventListener("click", async () => {
+        if (!document.getElementById("oab-ack")?.checked) {
+          alert("Aceite o aviso OAB antes de gerar minutas.");
+          return;
+        }
+        if (!currentTender?.id_pncp) {
+          alert("Abra esta tela com ?id=PNCP (a partir da lista de editais).");
+          return;
+        }
+        const modal = document.getElementById("kit-modal");
+        const out = document.getElementById("kit-output");
+        modal.classList.remove("hidden");
+        out.textContent = "Gerando kit via POST /advisory/" + currentTender.id_pncp + "/kit …";
+        try {
+          const res = await fetch("/advisory/" + currentTender.id_pncp + "/kit", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({}),
+          });
+          const data = await res.json();
+          out.textContent = JSON.stringify(data, null, 2);
+          window.__lastKit = data;
+        } catch (e) {
+          out.textContent = "Erro: " + (e.message || "API indisponível");
+        }
+      });
+
+      function closeKit() {
+        document.getElementById("kit-modal").classList.add("hidden");
+      }
+      document.getElementById("kit-close")?.addEventListener("click", closeKit);
+      document.getElementById("kit-close-2")?.addEventListener("click", closeKit);
+
+      document.getElementById("kit-apply")?.addEventListener("click", () => {
+        const kit = window.__lastKit;
+        const text =
+          kit?.documents?.impugnacao ||
+          kit?.impugnacao ||
+          kit?.kit?.impugnacao ||
+          kit?.minuta ||
+          kit?.texto ||
+          (typeof kit === "object" ? null : String(kit));
+        if (text) {
+          document.getElementById("draft-editor").innerHTML =
+            `<pre class="whitespace-pre-wrap font-body-sm">${esc(typeof text === "string" ? text : JSON.stringify(text, null, 2))}</pre>`;
+          document.getElementById("draft-editor").dataset.touched = "1";
+          closeKit();
+        } else {
+          alert("Kit sem texto de impugnação aplicável — revise o JSON.");
+        }
+      });
+    },
+  });
+</script>
+</body>
+</html>

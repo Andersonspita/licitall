@@ -7,7 +7,7 @@ from datetime import date, datetime
 from typing import Any
 
 import httpx
-from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
+from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
 
 from src.config import Settings, get_settings
 from src.models.enums import (
@@ -21,6 +21,16 @@ _ID_PNCP_RE = re.compile(r"^(\d{14})-1-(\d+)/(\d{4})$")
 
 class PncpError(RuntimeError):
     """Falha ao consultar ou baixar recursos do PNCP."""
+
+
+def _pncp_retryable(exc: BaseException) -> bool:
+    """Retry em 5xx / 429 / transporte. Timeout fica a cargo do job (retry por página)."""
+    if isinstance(exc, httpx.TimeoutException):
+        return False
+    if isinstance(exc, httpx.HTTPStatusError):
+        code = exc.response.status_code if exc.response is not None else 0
+        return code == 429 or code >= 500
+    return isinstance(exc, httpx.TransportError)
 
 
 @dataclass(frozen=True, slots=True)
@@ -90,15 +100,18 @@ class PncpClient:
         await self.aclose()
 
     @retry(
-        retry=retry_if_exception_type((httpx.TransportError, httpx.HTTPStatusError)),
-        wait=wait_exponential(multiplier=1, min=1, max=20),
-        stop=stop_after_attempt(4),
+        retry=retry_if_exception(_pncp_retryable),
+        wait=wait_exponential(multiplier=1, min=1, max=8),
+        stop=stop_after_attempt(3),
         reraise=True,
     )
     async def _get_json(self, url: str, params: dict[str, Any] | None = None) -> Any:
         response = await self._client.get(url, params=params)
         if response.status_code == 204:
             return {}
+        if response.status_code == 429:
+            # Propaga HTTPStatusError para o job layer aplicar Retry-After.
+            response.raise_for_status()
         if response.status_code >= 500:
             response.raise_for_status()
         if response.status_code >= 400:

@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LicitAll — Monitor PNCP</title>
+  <link rel="icon" href="/ui/assets/logo.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet">
+  <link href="/ui/assets/app.css" rel="stylesheet">
+  <script src="/ui/assets/tailwind-theme.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwind.config = window.__LICITALL_TW__;</script>
+  <script src="/ui/assets/auth.js"></script>
+  <script src="/ui/assets/api.js"></script>
+  <script src="/ui/assets/shell.js"></script>
+</head>
+<body class="bg-background font-body-md text-body-md text-on-surface">
+<div id="app-root">
+<div data-page class="flex flex-col w-full gap-space-lg max-w-4xl">
+  <div class="bg-surface-container-lowest p-space-lg rounded shadow-sm">
+    <div class="flex items-center gap-2 mb-2">
+      <span class="material-symbols-outlined text-secondary text-[28px]">radar</span>
+      <div>
+        <h1 class="font-headline-lg text-headline-lg tracking-tight">Monitor PNCP</h1>
+        <p class="font-body-sm text-on-surface-variant">Ingestão de publicações via API PNCP — Lei 14.133/2021.</p>
+      </div>
+    </div>
+    <span class="inline-flex px-2 py-0.5 rounded bg-tertiary-fixed text-on-tertiary-fixed font-label-sm font-bold">POST /ingestion/pncp/sync</span>
+  </div>
+
+  <form id="sync-form" class="bg-surface-container-lowest p-space-lg rounded shadow-sm flex flex-col gap-space-md">
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-space-md">
+      <label class="flex flex-col gap-1.5">
+        <span class="font-label-sm font-semibold text-on-surface-variant">Data inicial</span>
+        <input id="data_inicial" type="date" class="rounded bg-surface-container-low px-3 py-2 font-body-sm focus:outline-none focus:ring-2 focus:ring-secondary">
+      </label>
+      <label class="flex flex-col gap-1.5">
+        <span class="font-label-sm font-semibold text-on-surface-variant">Data final</span>
+        <input id="data_final" type="date" class="rounded bg-surface-container-low px-3 py-2 font-body-sm focus:outline-none focus:ring-2 focus:ring-secondary">
+      </label>
+      <label class="flex flex-col gap-1.5">
+        <span class="font-label-sm font-semibold text-on-surface-variant">UF (BR = Brasil inteiro)</span>
+        <input id="uf" type="text" maxlength="8" placeholder="BR" value="BR" class="rounded bg-surface-container-low px-3 py-2 font-body-sm uppercase focus:outline-none focus:ring-2 focus:ring-secondary">
+      </label>
+      <label class="flex items-center gap-2 mt-6">
+        <input id="only_open" type="checkbox" checked class="accent-secondary w-4 h-4">
+        <span class="font-label-md">Somente editais abertos</span>
+      </label>
+    </div>
+    <button type="submit" class="flex items-center justify-center gap-2 py-2.5 rounded bg-secondary text-on-secondary font-label-md font-semibold shadow-sm">
+      <span class="material-symbols-outlined text-[18px]" id="sync-icon">sync</span>
+      <span id="sync-label">Sincronizar publicações</span>
+    </button>
+  </form>
+
+  <div id="sync-result" class="hidden bg-surface-container-lowest p-space-md rounded shadow-sm">
+    <h2 class="font-headline-sm font-bold mb-2 flex items-center gap-2">
+      <span class="material-symbols-outlined text-secondary">check_circle</span>Resultado
+    </h2>
+    <pre id="sync-json" class="font-data-mono text-[11px] text-on-surface-variant bg-surface-container-low p-space-sm rounded overflow-auto"></pre>
+  </div>
+
+  <p class="font-label-sm text-[11px] text-outline">
+    Fonte: <code class="font-data-mono">https://pncp.gov.br/api/consulta/v1/contratacoes/publicacao</code>
+  </p>
+</div>
+</div>
+<script>
+  LicitAllShell.mount({
+    active: "monitor-pncp",
+    onReady() {
+      const today = new Date();
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+      document.getElementById("data_final").value = today.toISOString().slice(0, 10);
+      document.getElementById("data_inicial").value = yesterday.toISOString().slice(0, 10);
+
+      document.getElementById("sync-form").addEventListener("submit", async (ev) => {
+        ev.preventDefault();
+        const icon = document.getElementById("sync-icon");
+        const label = document.getElementById("sync-label");
+        icon.classList.add("animate-spin");
+        label.textContent = "Minerando PNCP…";
+        const body = {
+          only_open: document.getElementById("only_open").checked,
+        };
+        const di = document.getElementById("data_inicial").value;
+        const df = document.getElementById("data_final").value;
+        const uf = document.getElementById("uf").value.trim() || "BR";
+        if (di) body.data_inicial = di;
+        if (df) body.data_final = df;
+        body.uf = uf.toUpperCase();
+
+        const box = document.getElementById("sync-result");
+        const pre = document.getElementById("sync-json");
+        try {
+          const job = await LicitAllApi.syncPncpAsync(body, {
+            onProgress(j) {
+              const n = j.ingested || 0;
+              const cur = j.current_uf ? ` · ${j.current_uf}` : "";
+              label.textContent = `${n} no banco${cur}`.slice(0, 48);
+              pre.textContent = JSON.stringify(j, null, 2);
+              box.classList.remove("hidden");
+            },
+          });
+          pre.textContent = JSON.stringify(job, null, 2);
+          box.classList.remove("hidden");
+          if (job.status === "succeeded") label.textContent = `OK · ${job.ingested ?? 0}`;
+          else if (job.status === "partial") label.textContent = `Parcial · ${job.ingested ?? 0}`;
+          else label.textContent = "Falha PNCP";
+        } catch (e) {
+          pre.textContent = JSON.stringify({ error: e.message || "Falha de rede" }, null, 2);
+          box.classList.remove("hidden");
+          label.textContent = "Falha";
+        } finally {
+          icon.classList.remove("animate-spin");
+          setTimeout(() => { label.textContent = "Sincronizar publicações"; }, 5000);
+        }
+      });
+    },
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LicitAll — Dashboard Operacional B2G</title>
+  <link rel="icon" href="/ui/assets/logo.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet">
+  <link href="/ui/assets/app.css" rel="stylesheet">
+  <script src="/ui/assets/tailwind-theme.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwind.config = window.__LICITALL_TW__;</script>
+  <script src="/ui/assets/auth.js"></script>
+  <script src="/ui/assets/api.js"></script>
+  <script src="/ui/assets/shell.js"></script>
+</head>
+<body class="bg-background font-body-md text-body-md text-on-surface">
+<div id="app-root">
+<div data-page class="flex flex-col w-full gap-space-lg">
+
+  <!-- Welcome Banner -->
+  <section class="bg-surface-container-lowest rounded shadow-sm overflow-hidden">
+    <div class="p-space-lg flex flex-col xl:flex-row xl:items-center justify-between gap-space-md">
+      <div class="flex flex-col gap-space-sm">
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded bg-secondary-fixed text-on-secondary-fixed font-label-sm text-label-sm uppercase tracking-wider font-bold">
+            <span class="material-symbols-outlined text-[14px]">account_balance</span>GovTech B2G Intelligence
+          </span>
+          <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded bg-tertiary-fixed text-on-tertiary-fixed font-label-sm text-label-sm uppercase tracking-wider font-bold">
+            <span class="material-symbols-outlined text-[14px]">gavel</span>Lei 14.133/2021
+          </span>
+          <span class="font-data-mono text-[11px] text-outline font-medium">| Ciclo operacional ativo · Fase 6</span>
+        </div>
+        <h1 class="font-headline-xl text-headline-xl text-on-surface tracking-tight leading-tight">Dashboard Operacional B2G</h1>
+        <p class="font-body-md text-body-md text-on-surface-variant max-w-2xl">
+          Visão consolidada do pipeline PNCP → Docling → LangGraph → matchmaking → minutas OAB → WhatsApp.
+          Métricas em tempo real e radar de prazos decadenciais (Art. 164).
+        </p>
+      </div>
+      <div class="flex flex-wrap items-center gap-2 shrink-0">
+        <button id="btn-sync-pncp" type="button" class="flex items-center gap-2 px-4 py-2.5 rounded bg-primary text-on-primary hover:bg-surface-container-highest hover:text-on-surface transition-all font-label-md text-label-md font-semibold shadow-sm">
+          <span class="material-symbols-outlined text-[18px]" id="sync-icon">sync</span>
+          <span id="sync-label">Sync PNCP</span>
+        </button>
+        <a href="/ui/matchmaking.html" class="flex items-center gap-2 px-4 py-2.5 rounded bg-secondary text-on-secondary hover:bg-secondary-container hover:text-on-secondary-container transition-all font-label-md text-label-md font-semibold shadow-sm">
+          <span class="material-symbols-outlined text-[18px]">add_circle</span>Novo Matchmaking
+        </a>
+        <button id="btn-relatorio" type="button" class="flex items-center gap-2 px-4 py-2.5 rounded bg-surface-container text-on-surface hover:bg-surface-container-high transition-all font-label-md text-label-md font-medium">
+          <span class="material-symbols-outlined text-[18px]">download</span>Baixar Relatório
+        </button>
+      </div>
+    </div>
+    <!-- Microservices Health Strip -->
+    <div id="dash-health" class="px-space-lg py-space-sm bg-surface-container-low border-t border-surface-container flex flex-wrap items-center gap-2">
+      <span class="font-label-sm text-label-sm uppercase tracking-wider text-outline font-bold mr-2">Microserviços</span>
+      <span class="font-data-mono text-[11px] text-outline animate-pulse">Consultando /health/deps…</span>
+    </div>
+  </section>
+
+  <!-- 4 Metric Cards -->
+  <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-space-md">
+    <article class="flex flex-col justify-between p-space-md rounded bg-surface-container-lowest shadow-sm border border-surface-container-low hover:shadow-md transition-shadow">
+      <div class="flex items-start justify-between gap-2">
+        <div>
+          <span class="font-label-md text-label-md uppercase tracking-wider text-outline font-semibold">Editais Minerados</span>
+          <span class="block font-label-sm text-label-sm text-on-surface-variant mt-0.5">tender_ingest · PNCP</span>
+        </div>
+        <span class="material-symbols-outlined p-2 rounded bg-secondary-container text-on-secondary-container text-[22px]">gavel</span>
+      </div>
+      <div class="mt-space-sm flex items-end justify-between">
+        <div>
+          <span id="m-editais" class="font-headline-xl text-headline-xl font-bold text-on-surface leading-none">—</span>
+          <span id="m-editais-sub" class="ml-1 font-label-sm text-label-sm text-on-surface-variant font-semibold">carregando</span>
+        </div>
+        <a href="/ui/editais.html" class="font-label-sm text-secondary font-bold hover:underline">Ver todos →</a>
+      </div>
+      <div class="mt-3 h-1.5 rounded-full bg-surface-container-low overflow-hidden">
+        <div class="h-full w-[72%] rounded-full bg-secondary"></div>
+      </div>
+    </article>
+
+    <article class="flex flex-col justify-between p-space-md rounded bg-surface-container-lowest shadow-sm border border-surface-container-low hover:shadow-md transition-shadow">
+      <div class="flex items-start justify-between gap-2">
+        <div>
+          <span class="font-label-md text-label-md uppercase tracking-wider text-outline font-semibold">Volume Financeiro</span>
+          <span class="block font-label-sm text-label-sm text-on-surface-variant mt-0.5">estimado · base ativa</span>
+        </div>
+        <span class="material-symbols-outlined p-2 rounded bg-tertiary-fixed/20 text-on-tertiary-container text-[22px]">payments</span>
+      </div>
+      <div class="mt-space-sm">
+        <span id="m-volume" class="font-headline-xl text-headline-xl font-bold text-on-surface leading-none">—</span>
+        <span id="m-volume-sub" class="block font-label-sm text-label-sm text-on-surface-variant mt-1">soma valor estimado</span>
+      </div>
+      <div class="mt-3 flex flex-wrap gap-1" id="m-uf-chips"></div>
+    </article>
+
+    <article class="flex flex-col justify-between p-space-md rounded bg-surface-container-lowest shadow-sm border border-surface-container-low hover:shadow-md transition-shadow">
+      <div class="flex items-start justify-between gap-2">
+        <div>
+          <span class="font-label-md text-label-md uppercase tracking-wider text-outline font-semibold">Por status pipeline</span>
+          <span class="block font-label-sm text-label-sm text-on-surface-variant mt-0.5">INGESTED → NOTIFIED</span>
+        </div>
+        <span class="material-symbols-outlined p-2 rounded bg-tertiary-fixed text-on-tertiary-fixed text-[22px]">account_tree</span>
+      </div>
+      <div class="mt-space-sm flex items-end justify-between">
+        <div>
+          <span id="m-matches" class="font-headline-xl text-headline-xl font-bold text-on-surface leading-none">—</span>
+          <span class="ml-1 font-label-sm text-label-sm text-on-surface-variant font-semibold">status distintos</span>
+        </div>
+        <a href="/ui/matchmaking.html" class="font-label-sm text-secondary font-bold hover:underline">Match →</a>
+      </div>
+      <div id="m-status-chips" class="mt-3 flex flex-wrap gap-2 font-data-mono text-[10px]"></div>
+    </article>
+
+    <article class="flex flex-col justify-between p-space-md rounded bg-surface-container-lowest shadow-sm border border-error/20 hover:shadow-md transition-shadow">
+      <div class="flex items-start justify-between gap-2">
+        <div>
+          <span class="font-label-md text-label-md uppercase tracking-wider text-error font-semibold">Prazos Críticos Art.164</span>
+          <span class="block font-label-sm text-label-sm text-error font-medium mt-0.5">Impugnação · dias úteis</span>
+        </div>
+        <span class="material-symbols-outlined p-2 rounded bg-error-container text-error text-[22px]">timer</span>
+      </div>
+      <div class="mt-space-sm">
+        <span id="m-prazos" class="font-headline-xl text-headline-xl font-bold text-error leading-none">—</span>
+        <span class="font-headline-sm text-headline-sm text-error ml-1">editais</span>
+        <span id="m-prazos-sub" class="block font-label-sm text-label-sm text-on-surface-variant mt-1">calculado da data de abertura</span>
+      </div>
+      <a href="/ui/editais.html" class="mt-3 flex items-center justify-center gap-1.5 py-1.5 rounded bg-error-container text-on-error-container font-label-sm font-bold hover:opacity-90 transition-opacity">
+        <span class="material-symbols-outlined text-[16px]">list</span>Ver editais
+      </a>
+    </article>
+  </div>
+
+  <!-- Main 2-column layout -->
+  <div class="grid grid-cols-1 xl:grid-cols-12 gap-space-lg items-start">
+
+    <!-- LEFT COLUMN -->
+    <div class="xl:col-span-8 flex flex-col gap-space-lg">
+
+      <!-- LangGraph Pipeline -->
+      <section class="bg-surface-container-lowest rounded shadow-sm overflow-hidden">
+        <div class="p-space-md bg-surface-container-low flex flex-col sm:flex-row sm:items-center justify-between gap-space-sm">
+          <div class="flex items-center gap-3">
+            <span class="material-symbols-outlined text-secondary text-[28px]">hub</span>
+            <div>
+              <h2 class="font-headline-sm text-headline-sm text-on-surface font-bold">Pipeline de Agentes LangGraph</h2>
+              <span class="font-body-sm text-body-sm text-on-surface-variant">ingest → parse → extract → legal RAG → matcher → outreach</span>
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="px-2 py-0.5 rounded bg-secondary-fixed text-on-secondary-fixed font-label-sm font-bold">6 nodes</span>
+            <a href="/ui/pipeline.html" class="font-label-sm text-secondary font-bold hover:underline">Ver grafo →</a>
+          </div>
+        </div>
+        <div class="p-space-md flex flex-col gap-space-md">
+          <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
+            <div class="relative p-3 rounded bg-surface-container-low border border-surface-container group hover:bg-surface-container-high transition-colors">
+              <div class="font-data-mono text-[10px] font-bold text-outline">NODE 01</div>
+              <div class="font-label-md font-bold mt-1 text-on-surface">Mineração PNCP</div>
+              <div class="mt-1 font-data-mono text-[9px] text-on-tertiary-container">● online</div>
+              <span class="material-symbols-outlined absolute top-2 right-2 text-[16px] text-outline opacity-50">radar</span>
+            </div>
+            <div class="relative p-3 rounded bg-surface-container-low border border-surface-container group hover:bg-surface-container-high transition-colors">
+              <div class="font-data-mono text-[10px] font-bold text-outline">NODE 02</div>
+              <div class="font-label-md font-bold mt-1 text-on-surface">Download TR</div>
+              <div class="mt-1 font-data-mono text-[9px] text-on-tertiary-container">● online</div>
+              <span class="material-symbols-outlined absolute top-2 right-2 text-[16px] text-outline opacity-50">cloud_download</span>
+            </div>
+            <div class="relative p-3 rounded bg-secondary-container/30 border-2 border-secondary shadow-sm">
+              <div class="font-data-mono text-[10px] font-bold text-secondary">NODE 03 · ATIVO</div>
+              <div class="font-label-md font-bold mt-1 text-on-secondary-container">Docling OCR</div>
+              <div class="mt-1 font-data-mono text-[9px] text-secondary">● processando 3 PDFs</div>
+              <span class="material-symbols-outlined absolute top-2 right-2 text-[16px] text-secondary">document_scanner</span>
+            </div>
+            <div class="relative p-3 rounded bg-surface-container-low border border-surface-container group hover:bg-surface-container-high transition-colors">
+              <div class="font-data-mono text-[10px] font-bold text-outline">NODE 04</div>
+              <div class="font-label-md font-bold mt-1 text-on-surface">RAG Jurídico</div>
+              <div class="mt-1 font-data-mono text-[9px] text-on-tertiary-container">● pgvector</div>
+              <span class="material-symbols-outlined absolute top-2 right-2 text-[16px] text-outline opacity-50">menu_book</span>
+            </div>
+            <div class="relative p-3 rounded bg-surface-container-low border border-surface-container group hover:bg-surface-container-high transition-colors">
+              <div class="font-data-mono text-[10px] font-bold text-outline">NODE 05</div>
+              <div class="font-label-md font-bold mt-1 text-on-surface">Matchmaking</div>
+              <div class="mt-1 font-data-mono text-[9px] text-on-tertiary-container">● Minha Receita</div>
+              <span class="material-symbols-outlined absolute top-2 right-2 text-[16px] text-outline opacity-50">handshake</span>
+            </div>
+            <div class="relative p-3 rounded bg-surface-container-low border border-surface-container group hover:bg-surface-container-high transition-colors">
+              <div class="font-data-mono text-[10px] font-bold text-outline">NODE 06</div>
+              <div class="font-label-md font-bold mt-1 text-on-surface">WhatsApp</div>
+              <div class="mt-1 font-data-mono text-[9px] text-outline">○ Evolution idle</div>
+              <span class="material-symbols-outlined absolute top-2 right-2 text-[16px] text-outline opacity-50">chat</span>
+            </div>
+          </div>
+          <!-- Capacity bar -->
+          <div class="flex flex-col gap-1.5">
+            <div class="flex items-center justify-between font-label-sm">
+              <span class="text-on-surface-variant font-semibold">Capacidade de processamento (Docling + GPU)</span>
+              <span class="font-data-mono text-[11px] text-secondary font-bold">68% · 3/5 slots</span>
+            </div>
+            <div class="h-2.5 rounded-full bg-surface-container-low overflow-hidden">
+              <div class="h-full rounded-full bg-gradient-to-r from-secondary to-tertiary-fixed-dim" style="width:68%"></div>
+            </div>
+            <div class="flex justify-between font-data-mono text-[10px] text-outline">
+              <span>0</span><span>Fila: 2 editais</span><span>100%</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Editais Table -->
+      <section class="bg-surface-container-lowest rounded shadow-sm overflow-hidden">
+        <div class="p-space-md bg-surface-container-low flex flex-col lg:flex-row lg:items-center justify-between gap-space-sm">
+          <div>
+            <h2 class="font-headline-sm text-headline-sm font-bold text-on-surface">Editais Prioritários — Radar B2G</h2>
+            <span class="font-body-sm text-body-sm text-on-surface-variant">Amostra operacional · score explicável · ações rápidas</span>
+          </div>
+          <div class="flex flex-wrap items-center gap-2">
+            <select id="filter-uf" class="rounded bg-surface-container-lowest px-2 py-1.5 font-label-sm text-label-sm text-on-surface border-0 focus:ring-2 focus:ring-secondary">
+              <option value="">Todas UFs</option>
+            </select>
+            <a href="/ui/editais.html" class="px-2.5 py-1.5 rounded bg-secondary-container text-on-secondary-container font-label-sm font-bold">Ver catálogo</a>
+          </div>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left min-w-[720px]">
+            <thead>
+              <tr class="bg-surface-container text-on-surface-variant font-label-md text-label-md uppercase tracking-wider">
+                <th class="px-4 py-3 font-semibold">ID PNCP & Órgão</th>
+                <th class="px-4 py-3 font-semibold">Objeto</th>
+                <th class="px-4 py-3 font-semibold text-center">Valor est.</th>
+                <th class="px-4 py-3 font-semibold text-center">Score</th>
+                <th class="px-4 py-3 font-semibold text-center">Art.164</th>
+                <th class="px-4 py-3 font-semibold text-right">Ações</th>
+              </tr>
+            </thead>
+            <tbody id="dash-tenders" class="divide-y divide-surface-container font-body-sm">
+            </tbody>
+          </table>
+        </div>
+        <div class="p-space-sm bg-surface-container-low flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-t border-surface-container">
+          <span class="font-label-sm text-label-sm text-on-surface-variant">Exibindo <strong id="table-range" class="text-on-surface">0</strong> de <strong id="table-total" class="text-on-surface">0</strong> editais minerados</span>
+          <a href="/ui/editais.html" class="px-3 py-1.5 rounded bg-secondary text-on-secondary font-label-sm font-bold">Ver todos</a>
+        </div>
+      </section>
+    </div>
+
+    <!-- RIGHT COLUMN -->
+    <div class="xl:col-span-4 flex flex-col gap-space-lg">
+
+      <!-- Radar Art.164 -->
+      <section class="bg-surface-container-lowest rounded shadow-sm overflow-hidden">
+        <div class="p-space-md bg-surface-container-low flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <span class="material-symbols-outlined text-error text-[24px]">policy</span>
+            <div>
+              <h2 class="font-headline-sm text-headline-sm font-bold">Radar Art. 164</h2>
+              <span class="font-label-sm text-label-sm text-on-surface-variant">Impugnação · dias úteis</span>
+            </div>
+          </div>
+          <span class="px-2 py-0.5 rounded bg-error-container text-on-error-container font-label-sm font-bold">Lei 14.133</span>
+        </div>
+        <div class="p-space-md flex flex-col gap-space-sm">
+          <p class="font-body-sm text-body-sm text-on-surface-variant leading-relaxed">
+            Contagem decadencial para impugnação e pedido de esclarecimento — <strong class="text-on-surface">3 dias úteis</strong> antes da sessão pública (Art. 164).
+          </p>
+          <div id="radar-list" class="flex flex-col gap-2">
+            <p class="font-label-sm text-on-surface-variant text-center py-4">Carregando prazos…</p>
+          </div>
+          <a href="/ui/editais.html" class="w-full flex items-center justify-center gap-2 py-2.5 rounded bg-primary text-on-primary font-label-md font-semibold shadow-sm hover:opacity-90 transition-opacity">
+            <span class="material-symbols-outlined text-[18px]">list</span>Lista de editais
+          </a>
+        </div>
+      </section>
+
+      <!-- WhatsApp Feed -->
+      <section class="bg-surface-container-lowest rounded shadow-sm overflow-hidden">
+        <div class="p-space-md bg-surface-container-low flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <span class="material-symbols-outlined text-on-tertiary-container text-[24px]">chat</span>
+            <div>
+              <h2 class="font-headline-sm text-headline-sm font-bold">Disparos WhatsApp</h2>
+              <span class="font-label-sm text-label-sm text-outline">Evolution API · digest B2G</span>
+            </div>
+          </div>
+          <span id="wa-badge" class="px-1.5 py-0.5 rounded bg-surface-container text-on-surface-variant font-data-mono text-[10px] font-bold">sem histórico</span>
+        </div>
+        <ul id="wa-feed" class="divide-y divide-surface-container">
+          <li class="px-space-md py-6 text-center font-label-sm text-on-surface-variant">
+            Disparos não são persistidos ainda. Use a
+            <a href="/ui/whatsapp.html" class="text-secondary font-semibold hover:underline">central WhatsApp</a>
+            com editais reais.
+          </li>
+        </ul>
+        <div class="p-space-sm bg-surface-container-low border-t border-surface-container">
+          <a href="/ui/whatsapp.html" class="w-full flex items-center justify-center gap-2 py-2 rounded bg-surface-container text-on-surface font-label-md font-semibold hover:bg-surface-container-high transition-colors">
+            <span class="material-symbols-outlined text-[18px]">open_in_new</span>Abrir central de disparos
+          </a>
+        </div>
+      </section>
+
+      <!-- Compliance OAB -->
+      <section class="p-space-md rounded bg-surface-container border border-surface-container-high flex flex-col gap-space-sm">
+        <div class="flex items-center gap-2">
+          <span class="material-symbols-outlined text-secondary text-[22px]">verified_user</span>
+          <span class="font-label-md text-label-md uppercase tracking-wider font-bold text-on-surface">Compliance OAB / B2G</span>
+        </div>
+        <p class="font-body-sm text-body-sm text-[11px] text-on-surface-variant leading-relaxed">
+          Minutas e pareceres gerados por IA são <strong class="text-on-surface">subsídio técnico preliminar</strong>
+          (Lei 8.906/1994 — Estatuto da OAB). Validação, assinatura e protocolo exigem advogado habilitado.
+          Marco licitatório: Lei Federal nº 14.133/2021.
+        </p>
+        <div class="flex flex-wrap gap-2 font-data-mono text-[10px]">
+          <span class="px-2 py-1 rounded bg-secondary-container text-on-secondary-container font-bold">OAB 8.906</span>
+          <span class="px-2 py-1 rounded bg-tertiary-fixed text-on-tertiary-fixed font-bold">Art. 164</span>
+          <span class="px-2 py-1 rounded bg-surface-container-lowest text-outline font-bold">LC 123/2006</span>
+        </div>
+        <a href="/ui/pecas.html" class="font-label-sm text-secondary font-bold hover:underline">Acessar hub de peças →</a>
+      </section>
+    </div>
+  </div>
+</div>
+</div>
+
+<script>
+  let cachedItems = [];
+  let lastStats = null;
+
+  function esc(s) {
+    return String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+
+  LicitAllShell.mount({
+    active: "dashboard-geral",
+    onReady() {
+      document.getElementById("btn-sync-pncp")?.addEventListener("click", async function () {
+        const icon = document.getElementById("sync-icon");
+        const label = document.getElementById("sync-label");
+        icon?.classList.add("animate-spin");
+        if (label) label.textContent = "Brasil · enfileirando…";
+        let lastIngested = -1;
+        try {
+          const job = await LicitAllApi.syncPncpAsync(
+            { only_open: true, uf: "BR" },
+            {
+              async onProgress(j) {
+                const msg = j.message || j.status || "Sync Brasil…";
+                if (label) {
+                  const uf = j.current_uf ? ` · ${j.current_uf}` : "";
+                  label.textContent = `${(j.ingested || 0)} editais${uf}`.slice(0, 42);
+                  label.title = msg;
+                }
+                // Atualiza lista/KPIs enquanto grava (streaming)
+                if ((j.ingested || 0) !== lastIngested) {
+                  lastIngested = j.ingested || 0;
+                  await refreshAll();
+                }
+              },
+            }
+          );
+          if (label) {
+            if (job.status === "succeeded") label.textContent = `OK Brasil · ${job.ingested ?? 0}`;
+            else if (job.status === "partial") label.textContent = `Parcial · ${job.ingested ?? 0}`;
+            else label.textContent = "Falha: " + (job.error || job.message || "PNCP").slice(0, 40);
+          }
+          await refreshAll();
+        } catch (err) {
+          if (label) label.textContent = "Falha: " + (err.message || "API").slice(0, 48);
+        } finally {
+          icon?.classList.remove("animate-spin");
+          setTimeout(() => { if (label) label.textContent = "Sync PNCP"; }, 8000);
+        }
+      });
+
+      document.getElementById("btn-relatorio")?.addEventListener("click", () => {
+        const blob = new Blob([JSON.stringify({
+          gerado: new Date().toISOString(),
+          stats: lastStats,
+          amostra: cachedItems.slice(0, 20),
+        }, null, 2)], { type: "application/json" });
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = "licitall-relatorio-dashboard.json";
+        a.click();
+        URL.revokeObjectURL(a.href);
+      });
+
+      document.getElementById("filter-uf")?.addEventListener("change", applyFilters);
+      loadHealth();
+      refreshAll();
+    },
+  });
+
+  async function refreshAll() {
+    try {
+      const [stats, list] = await Promise.all([
+        LicitAllApi.stats(),
+        LicitAllApi.listTenders({ limit: 50, offset: 0 }),
+      ]);
+      lastStats = stats;
+      cachedItems = list.items || [];
+      applyStats(stats);
+      applyFilters();
+      renderRadar(stats.prazos_criticos || []);
+    } catch (err) {
+      document.getElementById("dash-tenders").innerHTML =
+        `<tr><td colspan="6" class="px-4 py-8 text-center text-error">Falha ao carregar dados reais: ${esc(err.message)}. Sincronize o PNCP e verifique o Postgres.</td></tr>`;
+      document.getElementById("radar-list").innerHTML =
+        `<p class="font-label-sm text-error text-center py-4">${esc(err.message)}</p>`;
+    }
+  }
+
+  function applyStats(s) {
+    document.getElementById("m-editais").textContent = String(s.total ?? 0);
+    document.getElementById("m-editais-sub").textContent = "no banco";
+    document.getElementById("m-volume").textContent = LicitAllApi.formatBRL(s.valor_total_estimado_sum);
+    document.getElementById("m-volume-sub").textContent = "soma valor_total_estimado";
+    document.getElementById("m-prazos").textContent = String(s.prazos_criticos_count ?? 0);
+    document.getElementById("m-prazos-sub").textContent = "≤ 3 dias úteis até o limite Art. 164";
+
+    const byStatus = s.by_status || {};
+    const statusKeys = Object.keys(byStatus);
+    document.getElementById("m-matches").textContent = String(statusKeys.length);
+    document.getElementById("m-status-chips").innerHTML = statusKeys.length
+      ? statusKeys.map((k) =>
+          `<span class="px-1.5 py-0.5 rounded bg-surface-container text-on-surface font-bold">${esc(k)} ${byStatus[k]}</span>`
+        ).join("")
+      : `<span class="text-outline">Sem status</span>`;
+
+    const byUf = s.by_uf || {};
+    document.getElementById("m-uf-chips").innerHTML = Object.entries(byUf).slice(0, 6).map(([uf, c]) =>
+      `<span class="px-1.5 py-0.5 rounded bg-surface-container font-data-mono text-[10px] font-bold">${esc(uf)} ${c}</span>`
+    ).join("") || `<span class="font-label-sm text-outline">Sem UF</span>`;
+
+    // populate UF filter from real data
+    const sel = document.getElementById("filter-uf");
+    if (sel && Object.keys(byUf).length) {
+      const current = sel.value;
+      sel.innerHTML = `<option value="">Todas UFs</option>` +
+        Object.keys(byUf).sort().map((uf) => `<option value="${esc(uf)}">${esc(uf)}</option>`).join("");
+      sel.value = current;
+    }
+  }
+
+  function applyFilters() {
+    const uf = document.getElementById("filter-uf")?.value || "";
+    let rows = cachedItems;
+    if (uf) rows = rows.filter((r) => (r.uf || "") === uf);
+    renderTable(rows);
+  }
+
+  function renderTable(rows) {
+    const tb = document.getElementById("dash-tenders");
+    document.getElementById("table-range").textContent = String(rows.length);
+    document.getElementById("table-total").textContent = String(lastStats?.total ?? rows.length);
+    if (!tb) return;
+    if (!rows.length) {
+      tb.innerHTML = `<tr><td colspan="6" class="px-4 py-10 text-center text-on-surface-variant">
+        Nenhum edital. Use <strong>Sync PNCP</strong> ou o <a class="text-secondary font-semibold" href="/ui/monitor-pncp.html">Monitor PNCP</a>.
+      </td></tr>`;
+      return;
+    }
+    tb.innerHTML = rows.slice(0, 25).map((r) => {
+      const art = LicitAllApi.art164Label(r.art164);
+      const id = r.id_pncp;
+      return `<tr class="hover:bg-surface-container-low transition-colors">
+        <td class="px-4 py-3">
+          <div class="font-data-mono text-[11px] font-bold text-secondary">${esc(id)}</div>
+          <div class="font-label-md font-semibold text-on-surface">${esc(r.orgao_comprador || "—")}</div>
+          <span class="font-data-mono text-[10px] text-outline">${esc(r.uf || "—")}</span>
+        </td>
+        <td class="px-4 py-3 max-w-[200px]"><p class="line-clamp-2 text-on-surface-variant">${esc(r.objeto_resumido || "—")}</p></td>
+        <td class="px-4 py-3 text-center font-data-mono text-[12px] font-bold">${LicitAllApi.formatBRL(r.valor_total_estimado)}</td>
+        <td class="px-4 py-3 text-center">
+          <span class="px-2 py-0.5 rounded bg-surface-container text-on-surface font-data-mono text-[11px] font-bold">${esc(r.status || "—")}</span>
+        </td>
+        <td class="px-4 py-3 text-center">
+          <span class="px-1.5 py-0.5 rounded ${art.className} font-data-mono text-[10px]">${esc(art.text)}</span>
+        </td>
+        <td class="px-4 py-3">
+          <div class="flex flex-wrap justify-end gap-1">
+            <a href="/ui/edital.html?id=${encodeURIComponent(id)}" class="px-2 py-1 rounded bg-surface-container text-on-surface font-label-sm font-semibold hover:bg-surface-container-high">TR</a>
+            <a href="/ui/pecas.html?id=${encodeURIComponent(id)}" class="px-2 py-1 rounded bg-secondary text-on-secondary font-label-sm font-semibold">Peça</a>
+            <a href="/ui/whatsapp.html?id=${encodeURIComponent(id)}" class="px-2 py-1 rounded bg-tertiary-fixed text-on-tertiary-fixed font-label-sm font-semibold">WA</a>
+          </div>
+        </td>
+      </tr>`;
+    }).join("");
+  }
+
+  function renderRadar(items) {
+    const box = document.getElementById("radar-list");
+    if (!items.length) {
+      box.innerHTML = `<p class="font-label-sm text-on-surface-variant text-center py-4">Nenhum prazo crítico (≤ 3 dias úteis) com data de abertura informada.</p>`;
+      return;
+    }
+    box.innerHTML = items.slice(0, 5).map((r) => {
+      const d = r.art164?.dias_uteis_restantes;
+      return `<div class="p-space-sm rounded bg-error-container/40 border-l-4 border-error flex flex-col gap-1">
+        <div class="flex items-center justify-between gap-2">
+          <span class="font-data-mono text-[11px] font-bold text-error truncate">${esc(r.id_pncp)}</span>
+          <span class="px-1.5 py-0.5 rounded bg-error text-on-error font-label-sm font-bold shrink-0">${d}d úteis</span>
+        </div>
+        <span class="font-label-md font-semibold text-on-error-container">${esc(r.orgao_comprador || "—")}</span>
+        <span class="font-label-sm text-on-error-container line-clamp-2">${esc(r.objeto_resumido || "")}</span>
+        <a href="/ui/pecas.html?id=${encodeURIComponent(r.id_pncp)}" class="mt-1 inline-flex items-center gap-1 font-label-sm text-error font-bold hover:underline">
+          <span class="material-symbols-outlined text-[14px]">edit_document</span>Gerar peça
+        </a>
+      </div>`;
+    }).join("");
+  }
+
+  async function loadHealth() {
+    const el = document.getElementById("dash-health");
+    if (!el) return;
+    try {
+      const d = await LicitAllApi.healthDeps();
+      const services = d.services || [];
+      const byName = Object.fromEntries(services.map((s) => [String(s.service || "").toLowerCase(), s]));
+      if (byName.evolution_api) byName.evolution = byName.evolution_api;
+      const targets = [
+        ["postgres", "Postgres"],
+        ["redis", "Redis"],
+        ["minha_receita", "Receita"],
+        ["evolution", "Evolution"],
+      ];
+      el.innerHTML = `<span class="font-label-sm text-label-sm uppercase tracking-wider text-outline font-bold mr-2">Microserviços</span>` +
+        targets.map(([k, label]) => {
+          const svc = byName[k];
+          const ok = svc ? svc.status === "up" : false;
+          const lat = svc?.latency_ms != null ? `${svc.latency_ms}ms` : "";
+          return `<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-surface-container-lowest shadow-sm font-data-mono text-[11px]">
+            <span class="inline-block h-2 w-2 rounded-full ${ok ? "bg-on-tertiary-container" : "bg-error"}"></span>
+            <span class="font-bold text-on-surface">${label}</span>
+            <span class="text-outline">${ok ? "up" : "down"}${lat ? " · " + lat : ""}</span>
+          </span>`;
+        }).join("");
+    } catch {
+      el.innerHTML = `<span class="font-data-mono text-[11px] text-error">Health offline</span>`;
+    }
+  }
+</script>
+</body>
+</html>

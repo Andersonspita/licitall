@@ -13,7 +13,7 @@ Detalhes: [STATUS](docs/fase/STATUS.md) · [Fase 6](docs/tecnica/FASE6_INTEGRACA
 
 | Incluído | Excluído (referências locais no workspace) |
 |----------|--------------------------------------------|
-| `src/`, `docker/`, `docs/`, `docker-compose.yml`, `requirements.txt` | `DS4SD.Docling`, `langgraph`, `crewAI-examples`, `ragflow`, `minha-receita`, `querido-diario`, `evolution-api` |
+| `src/`, `app/web/`, `docker/`, `docs/`, `docker-compose.yml`, `requirements.txt` | `DS4SD.Docling`, `langgraph`, `crewAI-examples`, `ragflow`, `minha-receita`, `querido-diario`, `evolution-api` |
 
 ## Subir localmente
 
@@ -29,6 +29,9 @@ python scripts/smoke_compose.py --api http://127.0.0.1:8000
 ```
 
 - API: http://localhost:8000/health  
+- **UI:** http://localhost:8000/ui/login.html (demo `admin@licitall.local` / `licitall`)
+- **Guia PDF:** `docs/usuario/LicitAll_Guia_Usuario.pdf` (como usar + funcionalidades)
+- **Editais reais:** `GET /tenders` · stats `GET /tenders/stats`  
 - Docs OpenAPI: http://localhost:8000/docs  
 - Postgres+pgvector: `5432` · Redis: `6379` · Minha Receita: `8001` · Evolution: `8080`
 

@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LicitAll — Explorador & Análise de Edital</title>
+  <link rel="icon" href="/ui/assets/logo.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet">
+  <link href="/ui/assets/app.css" rel="stylesheet">
+  <script src="/ui/assets/tailwind-theme.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwind.config = window.__LICITALL_TW__;</script>
+  <script src="/ui/assets/auth.js"></script>
+  <script src="/ui/assets/api.js"></script>
+  <script src="/ui/assets/shell.js"></script>
+</head>
+<body class="bg-background font-body-md text-body-md text-on-surface">
+<div id="app-root">
+<div data-page class="flex flex-col w-full gap-space-md">
+
+  <!-- Header -->
+  <header class="bg-surface-container-lowest p-space-lg rounded shadow-sm flex flex-col gap-space-md">
+    <nav class="font-label-sm text-label-sm text-outline flex items-center gap-1 flex-wrap">
+      <a href="/ui/dashboard.html" class="hover:text-secondary transition-colors">Dashboard</a>
+      <span class="material-symbols-outlined text-[14px]">chevron_right</span>
+      <a href="/ui/editais.html" class="hover:text-secondary transition-colors">Editais & TRs</a>
+      <span class="material-symbols-outlined text-[14px]">chevron_right</span>
+      <span class="text-on-surface font-semibold">Análise de Edital</span>
+    </nav>
+    <div class="flex flex-wrap items-center gap-2">
+      <span id="chip-docling" class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-surface-container text-on-surface font-data-mono text-[10px] font-bold">
+        <span class="h-1.5 w-1.5 rounded-full bg-outline"></span>Docs · —
+      </span>
+      <span id="chip-pgvector" class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-surface-container text-on-surface font-data-mono text-[10px] font-bold">
+        <span class="h-1.5 w-1.5 rounded-full bg-outline"></span>Parsed · —
+      </span>
+      <span id="chip-status" class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-surface-container text-on-surface font-data-mono text-[10px] font-bold">
+        Status · —
+      </span>
+    </div>
+    <div class="flex flex-col xl:flex-row xl:items-start justify-between gap-space-md">
+      <div class="flex flex-col gap-2 flex-1">
+        <div id="edital-badges" class="flex flex-wrap items-center gap-2">
+          <span class="px-2 py-0.5 rounded bg-surface-container text-outline font-label-sm">Selecione um edital</span>
+        </div>
+        <h1 id="edital-title" class="font-headline-lg text-headline-lg text-on-surface tracking-tight leading-tight">
+          Explorador de Edital
+        </h1>
+        <div id="edital-meta" class="flex flex-wrap items-center gap-x-4 gap-y-1 font-body-sm text-on-surface-variant">
+          <span>Informe <code class="font-data-mono">?id=</code> na URL ou escolha em Editais & TRs.</span>
+        </div>
+      </div>
+      <div class="flex flex-wrap items-center gap-2 shrink-0">
+        <button id="btn-reprocess" type="button" class="flex items-center gap-1.5 px-3 py-2 rounded bg-surface-container text-on-surface font-label-md font-semibold hover:bg-surface-container-high transition-colors">
+          <span class="material-symbols-outlined text-[18px]">refresh</span>Reprocessar
+        </button>
+        <button id="btn-download-md" type="button" class="flex items-center gap-1.5 px-3 py-2 rounded bg-surface-container text-on-surface font-label-md font-semibold hover:bg-surface-container-high transition-colors">
+          <span class="material-symbols-outlined text-[18px]">download</span>Baixar .md
+        </button>
+        <a href="/ui/matchmaking.html" class="flex items-center gap-1.5 px-3 py-2 rounded bg-secondary text-on-secondary font-label-md font-semibold shadow-sm hover:bg-secondary-container hover:text-on-secondary-container transition-colors">
+          <span class="material-symbols-outlined text-[18px]">handshake</span>Matchmaking
+        </a>
+        <a href="/ui/monitor-pncp.html" class="flex items-center gap-1.5 px-3 py-2 rounded bg-surface-container-high text-on-surface font-label-md font-medium">
+          <span class="material-symbols-outlined text-[18px]">radar</span>PNCP
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Art. 164 Critical Alert -->
+  <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3 p-space-md rounded bg-error-container border-l-4 border-error shadow-sm">
+    <div class="flex items-start gap-3">
+      <span class="material-symbols-outlined text-error text-[32px] shrink-0">warning</span>
+      <div>
+        <div class="font-headline-sm text-headline-sm font-bold text-on-error-container">Alerta crítico — Art. 164, Lei 14.133/2021</div>
+        <p class="font-body-sm text-body-sm text-on-error-container mt-1 leading-relaxed">
+          Prazo decadencial para impugnação: <strong>2 dias úteis</strong> restantes (até <strong>25/09/2026</strong>, 3 dias úteis antes da sessão).
+          Cláusula <strong>7.3.2</strong> identificada como risco de restrição competitiva — certificação exclusiva sem equivalência.
+        </p>
+      </div>
+    </div>
+    <a href="/ui/pecas.html" class="shrink-0 flex items-center gap-2 px-4 py-2.5 rounded bg-primary text-on-primary font-label-md font-semibold shadow-sm hover:opacity-90 transition-opacity">
+      <span class="material-symbols-outlined text-[18px]">edit_document</span>Redigir Impugnação
+    </a>
+  </div>
+
+  <!-- 3-column layout -->
+  <div class="grid grid-cols-1 xl:grid-cols-12 gap-space-md items-start">
+
+    <!-- LEFT: Docs + TOC + Telemetry -->
+    <aside class="xl:col-span-3 flex flex-col gap-space-md">
+
+      <div class="bg-surface-container-lowest rounded shadow-sm overflow-hidden">
+        <div class="p-space-sm bg-surface-container-low font-label-md font-bold flex items-center justify-between">
+          <span class="flex items-center gap-2"><span class="material-symbols-outlined text-secondary text-[20px]">folder_open</span>Documentos parseados</span>
+          <span class="font-data-mono text-[10px] text-outline">3 arquivos</span>
+        </div>
+        <ul class="divide-y divide-surface-container font-label-sm">
+          <li class="px-space-sm py-2.5 flex items-center justify-between bg-secondary-container/10 cursor-pointer hover:bg-secondary-container/20 transition-colors">
+            <span class="flex items-center gap-2 min-w-0">
+              <span class="material-symbols-outlined text-[16px] text-secondary shrink-0">description</span>
+              <span class="truncate font-semibold">Edital_PE142.pdf</span>
+            </span>
+            <span class="font-data-mono text-[10px] text-secondary font-bold shrink-0 ml-2">Docling · 47 pág.</span>
+          </li>
+          <li class="px-space-sm py-2.5 flex items-center justify-between hover:bg-surface-container-low cursor-pointer transition-colors">
+            <span class="flex items-center gap-2 min-w-0">
+              <span class="material-symbols-outlined text-[16px] text-outline shrink-0">description</span>
+              <span class="truncate">TR_Anexo_I.pdf</span>
+            </span>
+            <span class="font-data-mono text-[10px] text-outline shrink-0 ml-2">Docling · 23 pág.</span>
+          </li>
+          <li class="px-space-sm py-2.5 flex items-center justify-between hover:bg-surface-container-low cursor-pointer transition-colors">
+            <span class="flex items-center gap-2 min-w-0">
+              <span class="material-symbols-outlined text-[16px] text-outline shrink-0">description</span>
+              <span class="truncate">Minuta_Contrato.pdf</span>
+            </span>
+            <span class="font-data-mono text-[10px] text-outline shrink-0 ml-2">OCR · 12 pág.</span>
+          </li>
+        </ul>
+        <div class="p-space-sm bg-surface-container-low border-t border-surface-container font-data-mono text-[10px] text-outline">
+          SHA256: a3f8…c21d · ingest 21/09/2026 09:14
+        </div>
+      </div>
+
+      <div class="bg-surface-container-lowest rounded shadow-sm p-space-sm">
+        <div class="font-label-md font-bold mb-2 flex items-center justify-between">
+          <span class="flex items-center gap-2"><span class="material-symbols-outlined text-secondary text-[20px]">list</span>Sumário (TOC)</span>
+          <span class="font-data-mono text-[10px] text-outline">12 seções</span>
+        </div>
+        <nav class="flex flex-col gap-0.5 font-label-sm max-h-48 overflow-y-auto">
+          <a href="#sec-1" class="px-2 py-1.5 rounded hover:bg-surface-container-low text-on-surface-variant">1. Objeto e escopo</a>
+          <a href="#sec-2" class="px-2 py-1.5 rounded hover:bg-surface-container-low text-on-surface-variant">2. Fundamentação legal</a>
+          <a href="#sec-3" class="px-2 py-1.5 rounded hover:bg-surface-container-low text-on-surface-variant">3. Modalidade e critério</a>
+          <a href="#sec-5" class="px-2 py-1.5 rounded hover:bg-surface-container-low text-on-surface-variant">5. Habilitação jurídica</a>
+          <a href="#sec-6" class="px-2 py-1.5 rounded hover:bg-surface-container-low text-on-surface-variant">6. Qualificação técnica</a>
+          <a href="#sec-7" class="px-2 py-1.5 rounded bg-error-container/30 text-on-error-container font-semibold flex items-center gap-1">
+            <span class="material-symbols-outlined text-[14px] text-error">warning</span>7.3.2 Exigência técnica
+          </a>
+          <a href="#sec-8" class="px-2 py-1.5 rounded hover:bg-surface-container-low text-on-surface-variant">8. Proposta comercial</a>
+          <a href="#sec-9" class="px-2 py-1.5 rounded hover:bg-surface-container-low text-on-surface-variant">9. Prazos e entrega</a>
+          <a href="#sec-10" class="px-2 py-1.5 rounded hover:bg-surface-container-low text-on-surface-variant">10. Garantias contratuais</a>
+          <a href="#sec-12" class="px-2 py-1.5 rounded hover:bg-surface-container-low text-on-surface-variant">12. Sanções administrativas</a>
+        </nav>
+      </div>
+
+      <div class="bg-surface-container-lowest rounded shadow-sm p-space-sm flex flex-col gap-2">
+        <div class="font-label-md font-bold flex items-center gap-2">
+          <span class="material-symbols-outlined text-secondary text-[20px]">monitoring</span>Telemetria Docling
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <div class="p-2 rounded bg-surface-container-low">
+            <span class="font-data-mono text-[9px] text-outline uppercase">Páginas OCR</span>
+            <span class="block font-headline-sm font-bold text-on-surface">82</span>
+          </div>
+          <div class="p-2 rounded bg-surface-container-low">
+            <span class="font-data-mono text-[9px] text-outline uppercase">Tabelas extraídas</span>
+            <span class="block font-headline-sm font-bold text-on-surface">14</span>
+          </div>
+          <div class="p-2 rounded bg-surface-container-low">
+            <span class="font-data-mono text-[9px] text-outline uppercase">Confiança média</span>
+            <span class="block font-headline-sm font-bold text-on-tertiary-container">96,4%</span>
+          </div>
+          <div class="p-2 rounded bg-surface-container-low">
+            <span class="font-data-mono text-[9px] text-outline uppercase">Tempo parse</span>
+            <span class="block font-headline-sm font-bold text-on-surface">47s</span>
+          </div>
+        </div>
+        <div class="p-2 rounded bg-error-container/30 border border-error/20">
+          <span class="font-label-sm font-bold text-error flex items-center gap-1">
+            <span class="material-symbols-outlined text-[14px]">smart_toy</span>2 alertas IA
+          </span>
+          <span class="font-label-sm text-on-error-container">Cl. 7.3.2 · Cl. 6.4.1 (porte ME/EPP)</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- CENTER: Markdown viewer -->
+    <section class="xl:col-span-5 bg-surface-container-lowest rounded shadow-sm overflow-hidden flex flex-col min-h-[560px]">
+      <div class="p-space-sm bg-surface-container-low flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-surface-container">
+        <div class="flex items-center gap-1">
+          <button type="button" data-tab="markdown" class="md-tab px-3 py-1.5 rounded bg-secondary-container text-on-secondary-container font-label-sm font-bold">Markdown</button>
+          <button type="button" data-tab="raw" class="md-tab px-3 py-1.5 rounded text-on-surface-variant hover:bg-surface-container font-label-sm">Raw JSON</button>
+          <button type="button" data-tab="diff" class="md-tab px-3 py-1.5 rounded text-on-surface-variant hover:bg-surface-container font-label-sm">Diff OCR</button>
+        </div>
+        <div class="flex items-center gap-1">
+          <button type="button" class="p-1.5 rounded hover:bg-surface-container-high" title="Zoom +"><span class="material-symbols-outlined text-[18px]">zoom_in</span></button>
+          <button type="button" class="p-1.5 rounded hover:bg-surface-container-high" title="Zoom -"><span class="material-symbols-outlined text-[18px]">zoom_out</span></button>
+          <button type="button" class="p-1.5 rounded hover:bg-surface-container-high" title="Destacar riscos"><span class="material-symbols-outlined text-[18px] text-error">flag</span></button>
+          <span class="font-data-mono text-[10px] text-outline ml-2">Ref. Docling · pág. 47–49</span>
+        </div>
+      </div>
+      <article id="md-viewer" class="p-space-md overflow-y-auto flex-1 max-h-[640px] font-body-sm leading-relaxed">
+        <h2 id="sec-1" class="font-headline-sm text-headline-sm font-bold text-on-surface mb-2 pb-1 border-b border-surface-container">1. Objeto e escopo</h2>
+        <p class="text-on-surface-variant mb-4">
+          Contratação de solução integrada de infraestrutura em nuvem soberana, incluindo provisionamento de clusters de processamento para cargas de inteligência artificial aplicada ao processamento judicial, conforme especificações detalhadas no Termo de Referência — Anexo I.
+        </p>
+
+        <h2 id="sec-5" class="font-headline-sm text-headline-sm font-bold text-on-surface mb-2 pb-1 border-b border-surface-container">5. Habilitação jurídica e fiscal</h2>
+        <p class="text-on-surface-variant mb-2">Exige-se, nos termos do Art. 67 da Lei Federal nº 14.133/2021:</p>
+        <ul class="list-disc pl-5 text-on-surface-variant mb-4 space-y-1">
+          <li>Regularidade fiscal perante a Fazenda Nacional, Estadual e Municipal;</li>
+          <li>Certidão negativa de débitos trabalhistas (CNDT);</li>
+          <li>Certidão negativa de falência ou recuperação judicial;</li>
+          <li>Comprovação de capacidade técnica mediante atestados compatíveis com o objeto.</li>
+        </ul>
+
+        <h2 id="sec-7" class="font-headline-sm text-headline-sm font-bold text-error mb-2 pb-1 border-b border-error/30">7.3.2 Exigência de certificação proprietária</h2>
+        <div class="p-space-sm rounded bg-error-container/40 border border-error/30 mb-4">
+          <div class="flex items-start gap-2 mb-2">
+            <span class="material-symbols-outlined text-error text-[22px] shrink-0">smart_toy</span>
+            <div>
+              <span class="font-label-md font-bold text-error">Insight IA — Risco jurídico ALTO</span>
+              <p class="font-label-sm text-on-error-container mt-0.5">Detectada vinculação a fabricante único sem critérios objetivos de equivalência. Sugestão: impugnação com fundamento Art. 41 (isonomia).</p>
+            </div>
+          </div>
+          <p class="text-on-surface">
+            <mark class="bg-tertiary-fixed/60 px-1 rounded font-semibold">Cláusula 7.3.2 — RISCO IDENTIFICADO:</mark>
+            O licitante deverá comprovar certificação <em>exclusiva</em> do fabricante XYZ Cloud Enterprise Suite, nível Platinum, emitida nos últimos 12 meses,
+            <strong>vedada equivalência</strong> por outras plataformas compatíveis com padrões abertos (OpenStack, Kubernetes CNCF).
+          </p>
+          <p class="mt-2 font-label-sm text-on-surface-variant">
+            Fundamentação RAG: Art. 41 (isonomia), Art. 6º, XXIII (vinculação ao edital), Art. 40, §1º (especificação) — Lei 14.133/2021.
+            Precedente TCU seed indexado no corpus LicitAll.
+          </p>
+        </div>
+
+        <h3 class="font-label-lg font-bold text-on-surface mb-2">7.4 Quadro de lotes e quantitativos</h3>
+        <div class="overflow-x-auto mb-4 rounded border border-surface-container">
+          <table class="w-full text-left font-label-sm">
+            <thead>
+              <tr class="bg-surface-container text-on-surface-variant font-label-md uppercase tracking-wider">
+                <th class="px-3 py-2">Lote</th>
+                <th class="px-3 py-2">Descrição</th>
+                <th class="px-3 py-2 text-right">Qtd.</th>
+                <th class="px-3 py-2 text-right">Valor unit.</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-surface-container">
+              <tr class="hover:bg-surface-container-low">
+                <td class="px-3 py-2 font-data-mono font-bold text-secondary">01</td>
+                <td class="px-3 py-2">Cluster GPU H100 — inferência IA</td>
+                <td class="px-3 py-2 text-right font-data-mono">4</td>
+                <td class="px-3 py-2 text-right font-data-mono">R$ 680.000</td>
+              </tr>
+              <tr class="hover:bg-surface-container-low">
+                <td class="px-3 py-2 font-data-mono font-bold text-secondary">02</td>
+                <td class="px-3 py-2">Storage NVMe soberano 500TB</td>
+                <td class="px-3 py-2 text-right font-data-mono">2</td>
+                <td class="px-3 py-2 text-right font-data-mono">R$ 420.000</td>
+              </tr>
+              <tr class="hover:bg-surface-container-low bg-error-container/10">
+                <td class="px-3 py-2 font-data-mono font-bold text-error">03</td>
+                <td class="px-3 py-2">Licenciamento XYZ Platinum <span class="text-error font-bold">⚠ cl. 7.3.2</span></td>
+                <td class="px-3 py-2 text-right font-data-mono">1</td>
+                <td class="px-3 py-2 text-right font-data-mono">R$ 890.000</td>
+              </tr>
+              <tr class="hover:bg-surface-container-low">
+                <td class="px-3 py-2 font-data-mono font-bold text-secondary">04</td>
+                <td class="px-3 py-2">Suporte 24×7 N3 — 36 meses</td>
+                <td class="px-3 py-2 text-right font-data-mono">1</td>
+                <td class="px-3 py-2 text-right font-data-mono">R$ 1.510.000</td>
+              </tr>
+            </tbody>
+            <tfoot>
+              <tr class="bg-surface-container-low font-bold">
+                <td class="px-3 py-2" colspan="3">Total estimado</td>
+                <td class="px-3 py-2 text-right font-data-mono text-secondary">R$ 4.500.000,00</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+
+        <h2 id="sec-9" class="font-headline-sm text-headline-sm font-bold text-on-surface mb-2 pb-1 border-b border-surface-container">9. Prazos e entrega</h2>
+        <p class="text-on-surface-variant mb-4">
+          Implantação em até 90 dias corridos após assinatura do contrato. SLA mínimo de 99,5% de disponibilidade mensal.
+          Penalidades conforme Art. 156, Lei 14.133/2021.
+        </p>
+
+        <h2 id="sec-12" class="font-headline-sm text-headline-sm font-bold text-on-surface mb-2 pb-1 border-b border-surface-container">12. Sanções administrativas</h2>
+        <p class="text-on-surface-variant">
+          Multa moratória de 0,5% ao dia sobre o valor do contrato, limitada a 10%, conforme Art. 156, §2º, Lei 14.133/2021.
+          Advertência, impedimento e declaração de inidoneidade nos termos dos Arts. 155 a 157.
+        </p>
+      </article>
+    </section>
+
+    <!-- RIGHT: Checklist + RAG -->
+    <aside class="xl:col-span-4 flex flex-col gap-space-md">
+
+      <div class="bg-surface-container-lowest rounded shadow-sm p-space-md">
+        <div class="flex items-center justify-between mb-3">
+          <div class="flex items-center gap-2">
+            <span class="material-symbols-outlined text-secondary text-[22px]">checklist</span>
+            <h2 class="font-headline-sm text-headline-sm font-bold">Checklist de Habilitação</h2>
+          </div>
+          <span class="font-data-mono text-[10px] text-outline">3/7 OK</span>
+        </div>
+        <ul class="flex flex-col gap-2.5 font-label-sm">
+          <li class="flex items-start gap-2 p-2 rounded bg-tertiary-fixed/10">
+            <input type="checkbox" checked disabled class="mt-0.5 accent-secondary w-4 h-4">
+            <div><span class="font-semibold text-on-surface">Certidões negativas</span><span class="block text-[11px] text-on-surface-variant">RFB, FGTS, Trabalhista — Art. 68</span></div>
+          </li>
+          <li class="flex items-start gap-2 p-2 rounded bg-tertiary-fixed/10">
+            <input type="checkbox" checked disabled class="mt-0.5 accent-secondary w-4 h-4">
+            <div><span class="font-semibold text-on-surface">Regularidade TCU/CNJ</span><span class="block text-[11px] text-on-surface-variant">Consulta automática OK</span></div>
+          </li>
+          <li class="flex items-start gap-2 p-2 rounded bg-tertiary-fixed/10">
+            <input type="checkbox" checked disabled class="mt-0.5 accent-secondary w-4 h-4">
+            <div><span class="font-semibold text-on-surface">Declaração ME/EPP</span><span class="block text-[11px] text-on-surface-variant">LC 123/2006 · cota 25%</span></div>
+          </li>
+          <li class="flex items-start gap-2 p-2 rounded hover:bg-surface-container-low">
+            <input type="checkbox" class="mt-0.5 accent-secondary w-4 h-4">
+            <div><span class="font-semibold">Atestado capacidade técnica — nuvem/IA</span><span class="block text-[11px] text-on-surface-variant">Mín. 2 atestados · Art. 67, III</span></div>
+          </li>
+          <li class="flex items-start gap-2 p-2 rounded bg-error-container/30 border border-error/20">
+            <input type="checkbox" class="mt-0.5 accent-error w-4 h-4">
+            <div><span class="font-semibold text-error">Certificação XYZ Platinum (cl. 7.3.2)</span><span class="block text-[11px] text-on-error-container">⚠ Impugnar ou solicitar equivalência</span></div>
+          </li>
+          <li class="flex items-start gap-2 p-2 rounded hover:bg-surface-container-low">
+            <input type="checkbox" class="mt-0.5 accent-secondary w-4 h-4">
+            <div><span>Balancete patrimonial último exercício</span><span class="block text-[11px] text-on-surface-variant">Índices Art. 69</span></div>
+          </li>
+          <li class="flex items-start gap-2 p-2 rounded hover:bg-surface-container-low">
+            <input type="checkbox" class="mt-0.5 accent-secondary w-4 h-4">
+            <div><span>Proposta de preços — modelo Anexo III</span><span class="block text-[11px] text-on-surface-variant">Sigilo até abertura</span></div>
+          </li>
+        </ul>
+        <a href="/ui/pecas.html" class="mt-3 w-full flex items-center justify-center gap-2 py-2 rounded bg-surface-container text-on-surface font-label-sm font-semibold hover:bg-surface-container-high">
+          <span class="material-symbols-outlined text-[16px]">fact_check</span>Exportar checklist
+        </a>
+      </div>
+
+      <div class="bg-surface-container-lowest rounded shadow-sm p-space-md flex flex-col gap-space-sm flex-1">
+        <div class="flex items-center gap-2">
+          <span class="material-symbols-outlined text-secondary text-[22px]">smart_toy</span>
+          <div>
+            <h2 class="font-headline-sm text-headline-sm font-bold">Copiloto RAG Jurídico</h2>
+            <span class="font-label-sm text-label-sm text-outline">Lei 14.133 + seed TCU · pgvector</span>
+          </div>
+        </div>
+        <form id="rag-form" class="flex flex-col gap-2">
+          <input id="rag-query" type="text" value="certificação exclusiva isonomia Art 41"
+            class="w-full rounded bg-surface-container-low px-3 py-2 text-on-surface font-body-sm focus:outline-none focus:ring-2 focus:ring-secondary">
+          <div class="flex gap-2">
+            <button type="submit" class="flex-1 flex items-center justify-center gap-2 py-2 rounded bg-secondary text-on-secondary font-label-md font-semibold">
+              <span class="material-symbols-outlined text-[18px]">search</span>Consultar RAG
+            </button>
+            <button type="button" id="rag-suggest" class="px-3 py-2 rounded bg-surface-container text-on-surface font-label-sm hover:bg-surface-container-high" title="Sugerir para cl. 7.3.2">
+              <span class="material-symbols-outlined text-[18px]">auto_awesome</span>
+            </button>
+          </div>
+        </form>
+        <div id="rag-results" class="flex flex-col gap-2 max-h-72 overflow-y-auto font-label-sm">
+          <div class="p-2 rounded bg-surface-container-low border-l-2 border-secondary">
+            <div class="flex items-center justify-between gap-2 mb-1">
+              <span class="font-data-mono text-[10px] font-bold text-secondary">Art. 41 · Lei 14.133</span>
+              <span class="font-data-mono text-[10px] text-outline">score 0.942</span>
+            </div>
+            <div class="font-label-sm font-semibold text-on-surface">Princípio da isonomia</div>
+            <p class="mt-1 text-[11px] leading-snug text-on-surface-variant">As licitações observarão o princípio da isonomia, vedadas preferências ou distinções injustificadas entre licitantes.</p>
+          </div>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <!-- OAB Footer -->
+  <footer class="p-space-md rounded bg-surface-container flex items-start gap-3 border border-surface-container-high">
+    <span class="material-symbols-outlined text-secondary text-[24px] shrink-0">verified_user</span>
+    <div>
+      <p class="font-body-sm text-body-sm text-[11px] text-on-surface-variant leading-relaxed">
+        Análise automatizada com apoio de IA (LangGraph + RAG pgvector). Minutas e pareceres são
+        <strong class="text-on-surface">subsídio técnico preliminar</strong> — Lei 8.906/1994 (Estatuto da OAB).
+        Revisão e protocolo exigem advogado habilitado. Marco: Lei Federal nº 14.133/2021.
+      </p>
+      <div class="mt-2 flex flex-wrap gap-2 font-data-mono text-[10px]">
+        <span class="px-2 py-0.5 rounded bg-secondary-container text-on-secondary-container">DISCLAIMER_OAB</span>
+        <span class="px-2 py-0.5 rounded bg-surface-container-lowest text-outline">extract v2.1 · 21/09/2026</span>
+      </div>
+    </div>
+  </footer>
+</div>
+</div>
+
+<script>
+  let currentId = "";
+
+  function esc(s) {
+    return String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+
+  function fillTender(t) {
+    currentId = t.id_pncp;
+    const art = LicitAllApi.art164Label(t.art164);
+    const fs = t.filesystem || {};
+    document.getElementById("edital-badges").innerHTML = `
+      <span class="px-2 py-0.5 rounded bg-secondary-fixed text-on-secondary-fixed font-label-sm font-bold uppercase">${esc(t.uf || "BR")}</span>
+      <span class="px-2 py-0.5 rounded bg-surface-container text-on-surface font-data-mono text-[11px] font-bold">${esc(t.id_pncp)}</span>
+      <span class="px-2 py-0.5 rounded bg-surface-container font-label-sm font-bold">${esc(t.status || "—")}</span>
+      <span class="px-2 py-0.5 rounded ${art.className} font-label-sm">${esc(art.text)}</span>
+      <span class="px-2 py-0.5 rounded bg-secondary-fixed/30 text-on-secondary-fixed font-label-sm font-bold">${esc(t.modalidade || "—")}</span>`;
+    document.getElementById("edital-title").textContent = t.objeto_resumido || t.id_pncp;
+    document.getElementById("edital-meta").innerHTML = `
+      <span class="flex items-center gap-1"><span class="material-symbols-outlined text-[16px]">account_balance</span>${esc(t.orgao_comprador || "—")}</span>
+      <span class="flex items-center gap-1"><span class="material-symbols-outlined text-[16px]">location_on</span>${esc(t.municipio || "—")} · ${esc(t.uf || "—")}</span>
+      <span class="flex items-center gap-1"><span class="material-symbols-outlined text-[16px]">gavel</span>Lei 14.133/2021</span>
+      <span class="flex items-center gap-1"><span class="material-symbols-outlined text-[16px]">event</span>Abertura: ${esc(t.data_abertura_propostas || "—")}</span>
+      <span class="flex items-center gap-1 font-data-mono text-secondary font-bold">${LicitAllApi.formatBRL(t.valor_total_estimado)}</span>`;
+    document.getElementById("chip-docling").innerHTML =
+      `<span class="h-1.5 w-1.5 rounded-full ${fs.has_docs ? "bg-on-tertiary-container" : "bg-outline"}"></span>Docs · ${fs.doc_count || 0}`;
+    document.getElementById("chip-pgvector").innerHTML =
+      `<span class="h-1.5 w-1.5 rounded-full ${fs.has_parsed ? "bg-on-tertiary-container" : "bg-outline"}"></span>Parsed · ${fs.has_parsed ? "sim" : "não"}`;
+    document.getElementById("chip-status").textContent = "Status · " + (t.status || "—");
+
+    const alertBox = document.getElementById("art164-alert");
+    if (alertBox && t.art164?.critico) {
+      alertBox.classList.remove("hidden");
+      const d = t.art164.dias_uteis_restantes;
+      alertBox.querySelector("[data-art164-text]")?.replaceWith?.();
+    }
+
+    const md = document.getElementById("md-viewer");
+    if (md) {
+      md.innerHTML = `<p class="text-on-surface-variant">Metadados PNCP carregados. Arquivos locais: <strong>${(fs.files || []).join(", ") || "nenhum baixado"}</strong>.</p>
+        <p class="mt-2">Use <strong>Reprocessar</strong> para <code>POST /agents/{id}/extract</code> ou baixe documentos em Monitor PNCP.</p>
+        <pre class="mt-3 p-3 rounded bg-surface-container-low font-data-mono text-[11px] overflow-auto">${esc(JSON.stringify(t, null, 2))}</pre>`;
+    }
+
+    const matchLink = document.querySelector('a[href="/ui/matchmaking.html"]');
+    if (matchLink) matchLink.href = "/ui/matchmaking.html?id=" + encodeURIComponent(t.id_pncp);
+    const pecaLinks = document.querySelectorAll('a[href="/ui/pecas.html"]');
+    pecaLinks.forEach((a) => { a.href = "/ui/pecas.html?id=" + encodeURIComponent(t.id_pncp); });
+  }
+
+  LicitAllShell.mount({
+    active: "explorador-analise-edital",
+    async onReady() {
+      const id = new URLSearchParams(location.search).get("id");
+      if (id) {
+        try {
+          const t = await LicitAllApi.getTender(id);
+          fillTender(t);
+        } catch (err) {
+          document.getElementById("edital-title").textContent = "Edital não encontrado";
+          document.getElementById("edital-meta").innerHTML = `<span class="text-error">${esc(err.message)}</span>
+            <a class="text-secondary font-semibold" href="/ui/editais.html">Voltar à lista</a>`;
+        }
+      } else {
+        try {
+          const list = await LicitAllApi.listTenders({ limit: 1 });
+          if (list.items?.[0]) {
+            location.replace("/ui/edital.html?id=" + encodeURIComponent(list.items[0].id_pncp));
+            return;
+          }
+        } catch { /* empty */ }
+      }
+
+      document.querySelectorAll(".md-tab").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          document.querySelectorAll(".md-tab").forEach((b) => {
+            b.className = "md-tab px-3 py-1.5 rounded text-on-surface-variant hover:bg-surface-container font-label-sm";
+          });
+          btn.className = "md-tab px-3 py-1.5 rounded bg-secondary-container text-on-secondary-container font-label-sm font-bold";
+        });
+      });
+
+      document.getElementById("btn-reprocess")?.addEventListener("click", async () => {
+        if (!currentId) { alert("Selecione um edital (?id=)."); return; }
+        const btn = document.getElementById("btn-reprocess");
+        btn.disabled = true;
+        btn.innerHTML = '<span class="material-symbols-outlined text-[18px] animate-spin">refresh</span>Processando…';
+        try {
+          const res = await fetch("/agents/" + currentId + "/extract", { method: "POST" });
+          const data = await res.json().catch(() => ({}));
+          alert(res.ok ? "Extract OK" : ("Falha: " + (data.detail || res.status)));
+        } catch {
+          alert("API indisponível");
+        } finally {
+          btn.disabled = false;
+          btn.innerHTML = '<span class="material-symbols-outlined text-[18px]">refresh</span>Reprocessar';
+        }
+      });
+
+      document.getElementById("btn-download-md")?.addEventListener("click", () => {
+        const md = document.getElementById("md-viewer")?.innerText || "";
+        const blob = new Blob([md], { type: "text/markdown" });
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = (currentId || "edital") + ".md";
+        a.click();
+        URL.revokeObjectURL(a.href);
+      });
+
+      document.getElementById("rag-form")?.addEventListener("submit", async (ev) => {
+        ev.preventDefault();
+        const q = document.getElementById("rag-query").value.trim();
+        const box = document.getElementById("rag-results");
+        if (!q) return;
+        box.innerHTML = `<p class="text-outline animate-pulse font-label-sm">Consultando GET /rag/search…</p>`;
+        try {
+          const res = await fetch(`/rag/search?q=${encodeURIComponent(q)}&top_k=5`);
+          const data = await res.json();
+          const hits = data.results || [];
+          box.innerHTML = hits.length ? hits.map((h) => `
+            <div class="p-2 rounded bg-surface-container-low border-l-2 border-secondary">
+              <div class="flex items-center justify-between gap-2 mb-1">
+                <span class="font-data-mono text-[10px] font-bold text-secondary">${esc(h.source || "lei_14133")}</span>
+                <span class="font-data-mono text-[10px] text-outline">score ${(h.score ?? 0).toFixed(3)}</span>
+              </div>
+              <div class="font-label-sm font-semibold text-on-surface">${esc(h.titulo || h.fundamentacao || "Trecho")}</div>
+              <p class="mt-1 text-[11px] leading-snug text-on-surface-variant">${esc(h.texto || "")}</p>
+            </div>`).join("") : `<p class="text-outline font-label-sm">Nenhum trecho encontrado.</p>`;
+        } catch {
+          box.innerHTML = `<p class="text-error font-label-sm">Falha ao consultar RAG.</p>`;
+        }
+      });
+    },
+  });
+</script>
+</body>
+</html>

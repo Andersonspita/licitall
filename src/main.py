@@ -6,15 +6,25 @@ from datetime import date, timedelta
 from typing import Any
 
 from fastapi import Depends, FastAPI, HTTPException
+from fastapi.responses import RedirectResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from sqlmodel.ext.asyncio.session import AsyncSession
+import httpx
 
+from pathlib import Path
 from src import __version__
 from src.agents.pipeline import TenderPipeline
 from src.config import get_settings
 from src.db import get_session, init_db
 from src.ingestion.client import PncpClient, PncpError
 from src.ingestion.service import download_tender_documents, ingest_publicacoes
+from src.ingestion.jobs import (
+    create_sync_job,
+    default_date_window,
+    enqueue_sync_job,
+    get_job,
+)
 from src.ingestion.storage import DocumentStorage
 from src.models.enums import DEFAULT_INGESTION_MODALITIES, ModalityEnum
 from src.matching.service import MatchmakingService
@@ -25,6 +35,7 @@ from src.infra.health import check_dependencies
 from src.pipeline.orchestrator import run_full_pipeline
 from src.rag.corpus import load_legal_corpus
 from src.rag.retriever import ensure_legal_index, get_legal_store, retrieve_legal_context
+from src.tenders import get_tender, list_tenders, tender_stats
 
 logger = logging.getLogger("licitall")
 
@@ -48,6 +59,21 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+_UI_DIR = Path(__file__).resolve().parents[1] / "app" / "web"
+if _UI_DIR.is_dir():
+    app.mount("/ui", StaticFiles(directory=str(_UI_DIR), html=True), name="ui")
+
+
+@app.get("/")
+async def root_redirect() -> RedirectResponse:
+    """UI operacional em /ui (login → dashboard)."""
+    return RedirectResponse(url="/ui/login.html", status_code=307)
+
+
+@app.get("/app")
+async def app_alias() -> RedirectResponse:
+    return RedirectResponse(url="/ui/", status_code=307)
+
 
 class IngestRequest(BaseModel):
     data_inicial: date | None = None
@@ -57,11 +83,33 @@ class IngestRequest(BaseModel):
     modalidades: list[ModalityEnum] = Field(default_factory=lambda: list(DEFAULT_INGESTION_MODALITIES))
 
 
+class IngestAsyncRequest(BaseModel):
+    """Sync assíncrono. uf=BR (padrão) varre todas as UFs; commit página a página."""
+
+    data_inicial: date | None = None
+    data_final: date | None = None
+    uf: str | None = Field(
+        default="BR",
+        min_length=2,
+        max_length=8,
+        description="BR = Brasil (todas UFs) ou sigla (SP, RJ…)",
+    )
+    only_open: bool = True
+    modalidades: list[ModalityEnum] = Field(default_factory=lambda: list(DEFAULT_INGESTION_MODALITIES))
+
+
 class IngestResponse(BaseModel):
     ingested: int
     uf: str | None
     data_inicial: date
     data_final: date
+
+
+class IngestJobResponse(BaseModel):
+    job_id: str
+    status: str
+    message: str
+    poll_url: str
 
 
 class DownloadResponse(BaseModel):
@@ -98,6 +146,48 @@ async def health_deps() -> dict[str, Any]:
     return await check_dependencies()
 
 
+@app.get("/tenders/stats")
+async def tenders_stats(session: AsyncSession = Depends(get_session)) -> dict[str, Any]:
+    """KPIs do dashboard a partir de `tender_ingest` (dados reais)."""
+    try:
+        return await tender_stats(session)
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"Postgres indisponível: {exc}") from exc
+
+
+@app.get("/tenders")
+async def tenders_list(
+    uf: str | None = None,
+    status: str | None = None,
+    q: str | None = None,
+    limit: int = 50,
+    offset: int = 0,
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, Any]:
+    """Lista editais ingeridos do PNCP com filtros (uf, status, busca textual)."""
+    try:
+        return await list_tenders(
+            session, uf=uf, status=status, q=q, limit=limit, offset=offset
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"Postgres indisponível: {exc}") from exc
+
+
+@app.get("/tenders/{id_pncp:path}")
+async def tenders_detail(
+    id_pncp: str,
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, Any]:
+    """Detalhe de um edital + hints de arquivos em data/raw."""
+    try:
+        row = await get_tender(session, id_pncp)
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"Postgres indisponível: {exc}") from exc
+    if not row:
+        raise HTTPException(status_code=404, detail=f"Edital não encontrado: {id_pncp}")
+    return row
+
+
 class PipelineRunRequest(BaseModel):
     company: CompanyContext | None = None
     download_if_missing: bool = True
@@ -131,6 +221,12 @@ async def sync_pncp(
     body: IngestRequest,
     session: AsyncSession = Depends(get_session),
 ) -> IngestResponse:
+    """Sync síncrono (legado, 1 UF). Prefira POST /ingestion/pncp/sync/async com uf=BR."""
+    if not body.uf:
+        raise HTTPException(
+            status_code=422,
+            detail="No sync síncrono informe uf (ex.: SP). Para Brasil use POST /ingestion/pncp/sync/async com uf=BR.",
+        )
     today = date.today()
     data_final = body.data_final or today
     data_inicial = body.data_inicial or (data_final - timedelta(days=1))
@@ -149,12 +245,66 @@ async def sync_pncp(
             )
     except PncpError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
+    except httpx.TimeoutException as exc:
+        raise HTTPException(
+            status_code=504,
+            detail=(
+                "PNCP não respondeu a tempo (timeout). Use POST /ingestion/pncp/sync/async "
+                "(retry por página + progresso)."
+            ),
+        ) from exc
+    except httpx.HTTPError as exc:
+        raise HTTPException(status_code=502, detail=f"Falha de rede no PNCP: {exc}") from exc
     return IngestResponse(
         ingested=ingested,
         uf=body.uf,
         data_inicial=data_inicial,
         data_final=data_final,
     )
+
+
+@app.post("/ingestion/pncp/sync/async", response_model=IngestJobResponse)
+async def sync_pncp_async(body: IngestAsyncRequest) -> IngestJobResponse:
+    """Enfileira sync PNCP (Brasil=UF a UF). Commit por página → lista cresce ao vivo."""
+    data_inicial, data_final = default_date_window()
+    if body.data_final:
+        data_final = body.data_final
+    if body.data_inicial:
+        data_inicial = body.data_inicial
+    else:
+        data_inicial = data_final - timedelta(days=1)
+    if data_inicial > data_final:
+        raise HTTPException(status_code=422, detail="data_inicial não pode ser posterior a data_final.")
+    if (data_final - data_inicial).days > 7:
+        raise HTTPException(
+            status_code=422,
+            detail="Janela máxima de 7 dias no sync async (reduz timeout no PNCP).",
+        )
+    try:
+        job = await create_sync_job(
+            uf=body.uf or "BR",
+            data_inicial=data_inicial,
+            data_final=data_final,
+            only_open=body.only_open,
+            modalidades=body.modalidades,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    enqueue_sync_job(job.id)
+    return IngestJobResponse(
+        job_id=job.id,
+        status=job.status,
+        message=job.message,
+        poll_url=f"/ingestion/pncp/sync/jobs/{job.id}",
+    )
+
+
+@app.get("/ingestion/pncp/sync/jobs/{job_id}")
+async def sync_pncp_job_status(job_id: str) -> dict[str, Any]:
+    job = await get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail=f"Job não encontrado: {job_id}")
+    return job.to_dict()
 
 
 @app.post("/ingestion/pncp/{id_pncp:path}/documents", response_model=DownloadResponse)

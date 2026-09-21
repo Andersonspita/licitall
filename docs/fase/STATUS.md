@@ -43,6 +43,10 @@
 - [x] `scripts/smoke_compose.py` + `docs/usuario/OPERACAO_DOCKER.md`
 - [x] Testes `tests/test_fase6_pipeline.py`
 - [x] Smoke Compose parcial (2026-08-24) — Postgres/Redis/Evolution API OK; Minha Receita off; pipeline 200
+- [x] UI web `/ui` — login + dashboard + explorador + peças + matchmaking + WhatsApp (2026-09-21)
+- [x] `GET /tenders` + `/tenders/stats` + `/tenders/{id}` — UI sem mocks; PDF guia usuário
+- [x] Sync PNCP async — `POST /ingestion/pncp/sync/async` + jobs (retry por página, progresso)
+- [x] Sync Brasil (`uf=BR`) — varre 27 UFs; commit por página → `GET /tenders` lista ao vivo
 
 ---
 
@@ -73,13 +77,19 @@ Inspirado em cases (BidPilot / Bandifinder / Licinexus), **sem** robô de lances
 
 Docs: `FASE4_MATCHING.md`, `FASE5_ADVISORY.md`, `API.md`.
 
+## Entrega 2026-09-21 — UI web
+
+Front estático em `app/web/` servido em `/ui` (login + dashboard + explorador + peças + matchmaking + WhatsApp).  
+Listagem e KPIs usam **dados reais** (`GET /tenders*`). Guia PDF: `docs/usuario/LicitAll_Guia_Usuario.pdf`.
+Doc: `docs/usuario/INTERFACE_WEB.md`. Demo: `admin@licitall.local` / `licitall`.
+
 ---
 
 ## Próxima ação recomendada
 
-1. Minha Receita: `docker compose --profile full up -d` (ou build local do clone) + ETL  
-2. Evolution QR: corrigir/pinar imagem do Manager ou usar API em :8081  
-3. Retentar `POST /ingestion/pncp/sync` (PNCP pode retornar 429)  
-4. Conectar WhatsApp e testar digest real (`/outreach/whatsapp/digest/from-company` com `send: true`)
+1. Sync Brasil: `POST /ingestion/pncp/sync/async` com `{ "uf": "BR", "only_open": true }` (Dashboard já usa BR)  
+2. Minha Receita: `docker compose --profile full up -d` + ETL  
+3. Evolution QR: conectar instância e testar digest real  
+4. Loop end-to-end com 1 edital no Postgres
 
 Script local (sem Docker): `scripts/smoke_local.py` · Doc: `docs/tecnica/SMOKE_LOCAL.md` · Fase 6: `docs/tecnica/FASE6_INTEGRACAO.md`

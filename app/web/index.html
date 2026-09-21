@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LicitAll</title>
+  <link rel="icon" href="/ui/assets/logo.svg" type="image/svg+xml">
+  <script src="/ui/assets/auth.js"></script>
+</head>
+<body>
+  <script>
+    if (typeof LicitAllAuth !== "undefined" && LicitAllAuth.isAuthenticated()) {
+      location.replace("/ui/dashboard.html");
+    } else {
+      location.replace("/ui/login.html");
+    }
+  </script>
+  <p style="font-family:system-ui,sans-serif;padding:2rem;color:#5c5548;background:#f6f3ec;margin:0">Redirecionando…</p>
+</body>
+</html>
