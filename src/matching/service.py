@@ -74,6 +74,8 @@ class OpportunityMatch(BaseModel):
     eligibility_ok: bool = True
     eligibility_warnings: list[str] = Field(default_factory=list)
     eligibility_failures: list[str] = Field(default_factory=list)
+    ramo_semantico: dict[str, Any] | None = None  # quando o ramo veio da similaridade de significado
+    ramo: str = "desconhecido"  # principal | secundario | significado | desconhecido | incompativel
 
 
 class CompanyOpportunityResult(BaseModel):
@@ -90,6 +92,55 @@ class CompanyOpportunityResult(BaseModel):
         default_factory=lambda: {"bid": 70.0, "review": REVIEW_THRESHOLD}
     )
     marco_legal: str = f"Lei 14.133/2021 c/c {LC123_REF}"
+
+
+async def _aplicar_ramo_semantico(
+    session: AsyncSession,
+    views: list[dict[str, Any]],
+    company: dict[str, Any],
+    avisos: list[str],
+    embedder: Any | None,
+    limiares: tuple[float, float] | None,
+) -> None:
+    """Marca `ramo_semantico` nos editais sem CNAE inferido. Falha do provedor vira aviso, nunca erro."""
+    from src.matching import ramo_semantico as rs
+    from src.matching.embedding_cache import vectors_with_cache
+
+    sem_ramo = [v for v in views if not v.get("cnaes_compativeis") and rs.texto_objeto(v)]
+    descricoes = rs.descricoes_cnae(company)
+    if not sem_ramo or not descricoes:
+        return
+    if embedder is None:
+        from src.rag.embeddings import EmbeddingProvider
+
+        embedder = EmbeddingProvider(dimensions=512, request_dimensions=True)
+    limiares = limiares or rs.LIMIARES_RAMO.get(embedder.backend)
+    if limiares is None:
+        if embedder.backend == "hash":
+            avisos.append(
+                f"{len(sem_ramo)} editais sem ramo identificado ficaram para revisão: configure GEMINI_API_KEY para "
+                "compará-los por significado com os CNAEs da empresa."
+            )
+        else:
+            avisos.append(f"Provedor {embedder.backend} sem limiares de ramo calibrados: comparação por significado desligada.")
+        return
+    try:
+        res = await vectors_with_cache(session, embedder, descricoes + [rs.texto_objeto(v) for v in sem_ramo], parcial=True)
+    except Exception as exc:  # noqa: BLE001 (banco/cache; o provedor já é tratado no modo parcial)
+        await session.rollback()
+        avisos.append(f"Comparação por significado indisponível ({exc}); editais sem ramo ficam para revisão.")
+        return
+    avaliados = rs.avaliar(sem_ramo, descricoes, res.vectors, limiares)
+    for id_pncp, ramo in avaliados.items():
+        next(v for v in sem_ramo if v["id_pncp"] == id_pncp)["ramo_semantico"] = ramo.as_dict()
+    if res.erro is not None:
+        avisos.append(
+            f"Comparação por significado parcial: {len(avaliados)} de {len(sem_ramo)} editais sem ramo comparados; "
+            f"o resto fica para revisão ({res.erro}). O que foi calculado ficou no cache: rode de novo depois para completar."
+        )
+
+
+ORDEM_RAMO = {"principal": 0, "secundario": 1, "significado": 1, "desconhecido": 2, "incompativel": 3}
 
 
 # Pontuar é barato (Python puro); o teto só protege a memória com bases muito grandes.
@@ -239,6 +290,8 @@ def _build_opportunity_match(
         eligibility_ok=verdict.eligible,
         eligibility_warnings=verdict.soft_warnings,
         eligibility_failures=verdict.hard_failures,
+        ramo_semantico=tender.get("ramo_semantico"),
+        ramo=breakdown.ramo,
     )
 
 
@@ -281,6 +334,8 @@ def _rank_pair(
             breakdown.recommendation = "REVIEW"
         else:
             breakdown.recommendation = "SKIP"
+        if verdict.rebaixa_bid and breakdown.recommendation == "BID":
+            breakdown.recommendation = "REVIEW"  # ex.: provável exclusividade ME/EPP não confirmada para porte Demais
     else:
         breakdown.recommendation = "SKIP"
     return breakdown, verdict
@@ -433,8 +488,14 @@ class MatchmakingService:
         require_proximity: bool = False,
         uf_filter: str | None = None,
         company: dict[str, Any] | None = None,
+        embedder: Any | None = None,
+        ramo_limiares: tuple[float, float] | None = None,
     ) -> CompanyOpportunityResult:
-        """Match inverso: CNPJ/empresa → oportunidades ranqueadas."""
+        """Match inverso: CNPJ/empresa → oportunidades ranqueadas.
+
+        Com `session`, editais cujo ramo o mapa de palavras-chave não identifica são comparados por significado com
+        os CNAEs da empresa (`ramo_semantico`), se o provedor de embeddings tiver limiares calibrados.
+        """
         avisos: list[str] = []
         thresholds = {"bid": 70.0, "review": REVIEW_THRESHOLD}
 
@@ -495,11 +556,17 @@ class MatchmakingService:
                 )
 
         company_cnaes = set(_company_cnae_list(company))
-        ranked: list[OpportunityMatch] = []
+        views: list[dict[str, Any]] = []
         for raw in tenders:
             tender_view = dict(raw)
             tender_view["cnaes_compativeis"] = resolve_cnaes(tender_view)
             tender_view["exclusivo_me_epp"] = resolve_exclusivo_me_epp(tender_view)
+            views.append(tender_view)
+        if session is not None:
+            await _aplicar_ramo_semantico(session, views, company, avisos, embedder, ramo_limiares)
+
+        ranked: list[OpportunityMatch] = []
+        for tender_view in views:
 
             # Atalho: se há CNAEs na empresa e no edital sem interseção, ainda pontua baixo —
             # mas evita ruído extremo quando ambos existem e não cruzam.
@@ -518,7 +585,9 @@ class MatchmakingService:
                 continue
             ranked.append(_build_opportunity_match(tender_view, breakdown, verdict))
 
-        ranked.sort(key=lambda m: m.score, reverse=True)
+        # Do negócio principal da empresa primeiro: uma distribuidora de papelaria quer papel A4 antes de móveis, mesmo
+        # que o edital de móveis valha mais (o fator valor favorece contratos grandes). Dentro do mesmo ramo, pela nota.
+        ranked.sort(key=lambda m: (ORDEM_RAMO.get(m.ramo, 9), -m.score))
         return CompanyOpportunityResult(
             cnpj=digits,
             razao_social=company.get("razao_social"),

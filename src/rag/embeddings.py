@@ -16,6 +16,20 @@ GEMINI_TENTATIVAS = 5
 GEMINI_ESPERA_MAX = 70  # s; a cota gratuita (100 textos/min) se renova em até 1 minuto
 
 
+def _mensagem_erro(r: httpx.Response) -> str:
+    """Só a mensagem do Google (o corpo inteiro é um JSON longo), na primeira linha."""
+    try:
+        msg = str(r.json()["error"].get("message") or "")
+    except (ValueError, KeyError, AttributeError, TypeError):
+        msg = r.text
+    return msg.strip().splitlines()[0][:160] if msg.strip() else f"HTTP {r.status_code}"
+
+
+def _cota_diaria(r: httpx.Response) -> bool:
+    """429 por cota do DIA (quotaId ...PerDay...): esperar segundos não adianta."""
+    return r.status_code == 429 and "perday" in r.text.lower()
+
+
 def _retry_delay(r: httpx.Response) -> float:
     """Segundos pedidos pela API em `error.details[].retryDelay` (ex.: "21s"); 0 se ausente."""
     try:
@@ -128,8 +142,12 @@ class EmbeddingProvider:
             else:
                 if r.status_code == 200:
                     return r.json()
+                if _cota_diaria(r):
+                    raise EmbeddingError(
+                        "cota diária do Gemini esgotada (renova à meia-noite do Pacífico, ~4h/5h de Brasília)"
+                    )
                 if r.status_code not in (429, 500, 502, 503, 504) or tentativa == GEMINI_TENTATIVAS:
-                    raise EmbeddingError(f"Gemini respondeu {r.status_code}: {r.text[:200]}")
+                    raise EmbeddingError(f"Gemini respondeu {r.status_code}: {_mensagem_erro(r)}")
                 espera = max(espera, _retry_delay(r))
             await asyncio.sleep(min(espera, GEMINI_ESPERA_MAX))
         raise EmbeddingError("Gemini indisponível.")  # inalcançável; satisfaz o tipo

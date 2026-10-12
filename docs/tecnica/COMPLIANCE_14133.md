@@ -41,3 +41,9 @@ Não substitui RAG/TCU (Fase 3), mas já aponta no texto:
 - capital social mínimo percentual
 - vistoria técnica obrigatória potencialmente restritiva
 - prazo de impugnação a conferir vs Art. 164
+
+## Exclusividade ME/EPP no matching (LC 123, Art. 48, I)
+
+- Edital que **declara** exclusividade ME/EPP: empresa de porte Demais é inelegível (regra `lote_exclusivo_me_epp`, hard).
+- Edital **sem** exclusividade declarada e com valor total de até R$ 80 mil: pela lei a contratação deveria ser exclusiva (salvo Art. 49), mas a fonte não informou (o PNCP só traz o benefício nos itens, que podem faltar). Para porte Demais o sistema **avisa e rebaixa BID para REVIEW** (regra `faixa_exclusiva_me_epp`, soft com `rebaixa_bid`); não declara inelegível, porque não se afirma o que a fonte não diz. Conferir no edital.
+

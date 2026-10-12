@@ -3,27 +3,24 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
 from typing import Any
 
 from sqlalchemy import delete as sa_delete
-from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from src.matching.embedding_cache import vectors_with_cache
 from src.matching.lexical import score_layer2
 from src.matching.semantic import (
     content_hash,
     cosine,
     final_score,
     profile_description,
-    resolve_vectors,
     sanitize_item_text,
     semantic_score,
 )
 from src.matching.hard_filters import ProfileFilters, evaluate_hard_filters, normalize_text
 from src.models.tables import (
-    EmbeddingCacheRow,
     InterestProfile,
     ProfileDescription,
     ProfileCatalogRule,
@@ -47,7 +44,7 @@ def _clean_terms(terms: list[str]) -> list[str]:
 async def create_profile(
     session: AsyncSession,
     *,
-    empresa_id: str,
+    empresa_id: uuid.UUID,
     nome_perfil: str,
     ufs_permitidas: list[str],
     valor_minimo_item: float = 0.0,
@@ -93,7 +90,7 @@ async def load_profile_view(session: AsyncSession, profile: InterestProfile) -> 
         palavras[rule.tipo].append(rule.termo)
     return {
         "id": str(profile.id),
-        "empresa_id": profile.empresa_id,
+        "empresa_id": str(profile.empresa_id),
         "nome_perfil": profile.nome_perfil,
         "ufs_permitidas": list(profile.ufs_permitidas),
         "valor_minimo_item": profile.valor_minimo_item,
@@ -109,7 +106,7 @@ async def get_profile(session: AsyncSession, profile_id: uuid.UUID) -> InterestP
     return await session.get(InterestProfile, profile_id)
 
 
-async def list_profiles(session: AsyncSession, empresa_id: str) -> list[InterestProfile]:
+async def list_profiles(session: AsyncSession, empresa_id: uuid.UUID) -> list[InterestProfile]:
     stmt = select(InterestProfile).where(InterestProfile.empresa_id == empresa_id).order_by(
         InterestProfile.created_at
     )
@@ -290,33 +287,7 @@ async def match_full(
         override.descricao if override else None,
     )
     texts = [t for _, _, t in scored if t] + ([profile_text] if profile_text else [])
-    hashes = {content_hash(t) for t in texts}
-    backend = embedder.cache_key
-    cached_rows = []
-    if hashes:
-        cached_rows = (
-            await session.exec(
-                select(EmbeddingCacheRow).where(
-                    EmbeddingCacheRow.backend == backend,
-                    EmbeddingCacheRow.content_hash.in_(hashes),
-                )
-            )
-        ).all()
-    cached = {r.content_hash: r.embedding for r in cached_rows}
-    resolution = await resolve_vectors(texts, cached, embedder)
-    for h, (text, vec) in resolution.new_entries.items():
-        await session.execute(
-            pg_insert(EmbeddingCacheRow)
-            .values(
-                content_hash=h,
-                backend=backend,
-                texto_base=text,
-                embedding=vec,
-                created_at=datetime.now(timezone.utc),
-            )
-            .on_conflict_do_nothing()
-        )
-    await session.commit()
+    resolution = await vectors_with_cache(session, embedder, texts)
 
     profile_vec = resolution.vectors.get(content_hash(profile_text)) if profile_text else None
     candidates: list[dict[str, Any]] = []
@@ -347,10 +318,10 @@ async def match_full(
         "excluidos_obrigatoria_ausente": excluded_mandatory,
         "limiar_alerta": 65,
         "embedding": {
-            "backend": backend,
+            "backend": embedder.cache_key,
             "textos_enviados_a_api": resolution.api_texts_sent,
             "chamadas_a_api": resolution.api_calls,
-            "reaproveitados_do_cache": len(cached),
+            "reaproveitados_do_cache": len(resolution.vectors) - len(resolution.new_entries),
         },
         "candidatos": candidates,
     }

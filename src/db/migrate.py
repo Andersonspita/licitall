@@ -74,17 +74,20 @@ def migrate(url: str | None = None, strict: bool = False) -> str:
     has_version, legacy = "alembic_version" in tables, "tender_ingest" in tables
     cfg = alembic_config(url)
     note = "ok"
-    if not has_version and legacy:
+    adotado = not has_version and legacy
+    if adotado:
         command.stamp(cfg, BASELINE)
-        diff = schema_diff(url)
         note = "banco legado adotado na migração-base"
+    command.upgrade(cfg, "head")
+    if adotado:
+        # Confere depois de migrar: antes, as mudanças das migrações novas apareceriam como divergência.
+        diff = schema_diff(url)
         if diff:
             msg = f"O esquema do banco legado diverge dos modelos ({len(diff)} diferenças): {diff[:3]}"
             if strict:
                 raise RuntimeError(msg)
             log.warning(msg)
             note += " (com divergências; veja o aviso)"
-    command.upgrade(cfg, "head")
     return note
 
 

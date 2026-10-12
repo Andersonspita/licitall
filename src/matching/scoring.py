@@ -28,6 +28,12 @@ WEIGHT_ECONOMIC = 15.0
 WEIGHT_DEADLINE = 15.0
 
 BID_THRESHOLD = 70.0
+TETO_RAMO_DESCONHECIDO = 45.0
+# Só CNAE secundário em comum: empresas registram muitos secundários (uma distribuidora de papelaria com 24, de móveis a
+# vestuário); a atividade principal é evidência mais forte de que o edital é do negócio dela.
+WEIGHT_CNAE_SECUNDARIO = 28.0
+# Ramo identificado por significado (sem CNAE): um pouco menos que CNAE compatível, que é evidência mais forte.
+WEIGHT_RAMO_SEMANTICO = 28.0
 REVIEW_THRESHOLD = 40.0
 
 
@@ -39,6 +45,7 @@ class ScoreBreakdown:
     economic: float = 0.0
     deadline: float = 0.0
     total: float = 0.0
+    ramo: str = "desconhecido"  # principal | secundario | significado | desconhecido | incompativel
     explanations: list[str] = field(default_factory=list)
     recommendation: Recommendation = "SKIP"
 
@@ -112,7 +119,12 @@ def score_match(
         # Ramo conhecido dos dois lados e sem interseção: UF, porte, valor e prazo sozinhos (até 65 pts)
         # não tornam o edital relevante.
         total = REVIEW_THRESHOLD - 5
-        explanations.append(f"Ramo incompatível (CNAE) → teto {total:.0f}, abaixo de revisar")
+        explanations.append(f"Ramo incompatível → teto {total:.0f}, abaixo de revisar")
+    elif _ramo_desconhecido(tender) and total > TETO_RAMO_DESCONHECIDO:
+        # Ramo do edital não identificado (objeto genérico, sem itens): fica para revisão, nunca BID, e abaixo
+        # de qualquer edital de ramo compatível. Sem isso, UF + porte + valor + prazo davam BID a qualquer empresa.
+        total = TETO_RAMO_DESCONHECIDO
+        explanations.append(f"Ramo do edital não identificado → teto {total:.0f} (revisar manualmente)")
 
     if hard_fail and total >= REVIEW_THRESHOLD:
         total = min(total * 0.25, 35.0)
@@ -129,9 +141,17 @@ def score_match(
         economic=economic_pts,
         deadline=deadline_pts,
         total=total,
+        ramo=_tipo_ramo(tender, cnae_pts),
         explanations=explanations,
         recommendation=rec,
     )
+
+
+def _tipo_ramo(tender: dict[str, Any], cnae_pts: float) -> str:
+    if tender.get("cnaes_compativeis"):
+        return {WEIGHT_CNAE: "principal", WEIGHT_CNAE_SECUNDARIO: "secundario"}.get(cnae_pts, "incompativel")
+    status = (tender.get("ramo_semantico") or {}).get("status")
+    return {"compativel": "significado", "incompativel": "incompativel"}.get(status, "desconhecido")
 
 
 def matching_score(
@@ -171,11 +191,29 @@ def _score_cnae(tender: dict[str, Any], company: dict[str, Any]) -> tuple[float,
     company_cnaes = _company_cnaes(company)
     if tender_cnaes and company_cnaes & tender_cnaes:
         overlap = sorted(company_cnaes & tender_cnaes)
-        return WEIGHT_CNAE, [f"CNAE compatível (+{WEIGHT_CNAE:.0f}): {', '.join(overlap[:4])}"]
+        principal = str(company.get("cnae_fiscal") or "")
+        if not principal or principal in tender_cnaes:
+            return WEIGHT_CNAE, [f"CNAE compatível (+{WEIGHT_CNAE:.0f}): {', '.join(overlap[:4])}"]
+        return WEIGHT_CNAE_SECUNDARIO, [
+            f"CNAE secundário compatível (+{WEIGHT_CNAE_SECUNDARIO:.0f}): {', '.join(overlap[:4])}"
+        ]
     if not tender_cnaes:
+        ramo = tender.get("ramo_semantico") or {}
+        if ramo.get("status") == "compativel":
+            return WEIGHT_RAMO_SEMANTICO, [
+                f"Objeto semelhante a \"{ramo.get('referencia')}\" (similaridade {ramo.get('similaridade')}) "
+                f"(+{WEIGHT_RAMO_SEMANTICO:.0f})"
+            ]
+        if ramo.get("status") == "incompativel":
+            return 0.0, [f"Objeto sem relação com o ramo da empresa (similaridade {ramo.get('similaridade')}) (+0)"]
         pts = 12.0
         return pts, [f"Sem CNAE no edital — pontuação parcial (+{pts:.0f})"]
     return 0.0, ["Sem sobreposição de CNAE (+0)"]
+
+
+def _ramo_desconhecido(tender: dict[str, Any]) -> bool:
+    status = (tender.get("ramo_semantico") or {}).get("status")
+    return not tender.get("cnaes_compativeis") and status not in ("compativel", "incompativel")
 
 
 def _score_geography(

@@ -10,7 +10,7 @@ from typing import Any
 
 import yaml
 
-from src.compliance.lei_14133 import data_abertura_certame, prazo_impugnacao_art_164
+from src.compliance.lei_14133 import data_abertura_certame, is_exclusive_me_epp_value, prazo_impugnacao_art_164
 from src.matching.client import PORTE_MAP, SITUACAO_ATIVA
 from src.matching.scoring import BID_THRESHOLD, REVIEW_THRESHOLD
 from src.models.enums import CompanySize
@@ -24,6 +24,7 @@ class EligibilityVerdict:
     hard_failures: list[str] = field(default_factory=list)
     soft_warnings: list[str] = field(default_factory=list)
     rules_applied: list[str] = field(default_factory=list)
+    rebaixa_bid: bool = False  # aviso que impede BID (vira REVIEW) sem tornar inelegível
     thresholds: dict[str, float] = field(
         default_factory=lambda: {"bid": BID_THRESHOLD, "review": REVIEW_THRESHOLD}
     )
@@ -37,6 +38,10 @@ def load_eligibility_config(path: str | None = None) -> dict[str, Any]:
     if not isinstance(data, dict):
         return {}
     return data
+
+
+def _moeda(valor: float) -> str:
+    return f"{valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
 
 def evaluate_eligibility(
@@ -71,6 +76,8 @@ def evaluate_eligibility(
             verdict.hard_failures.append(message)
         else:
             verdict.soft_warnings.append(message)
+            if (rule.get("params") or {}).get("rebaixa_bid"):
+                verdict.rebaixa_bid = True
 
     # empresa_ativa
     active = (
@@ -95,6 +102,16 @@ def evaluate_eligibility(
             failed=porte not in {CompanySize.ME, CompanySize.EPP},
             detail=f"porte={porte.value}",
         )
+    else:
+        # Sem exclusividade declarada (o PNCP só a informa nos itens, que podem faltar): não é inelegível, mas o
+        # valor indica que provavelmente é exclusivo. Não afirma o que a fonte não diz; avisa e pede conferência.
+        valor = float(tender.get("valor_total_estimado") or 0)
+        if is_exclusive_me_epp_value(valor):
+            _apply(
+                "faixa_exclusiva_me_epp",
+                failed=porte not in {CompanySize.ME, CompanySize.EPP},
+                detail=f"valor R$ {_moeda(valor)}, porte {porte.value}",
+            )
 
     # proximidade_obrigatoria
     if require_proximity:

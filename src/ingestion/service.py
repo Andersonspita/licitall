@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import html
+import unicodedata
 from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
@@ -37,6 +39,13 @@ def _parse_dt(value: Any) -> datetime | None:
     return parsed
 
 
+def _texto(value: Any) -> str | None:
+    """O PNCP às vezes manda acentos como entidades HTML decompostas ("LOCAC&#807;A&#771;O"): volta a "LOCAÇÃO"."""
+    if value is None:
+        return None
+    return unicodedata.normalize("NFC", html.unescape(str(value)))
+
+
 def _orgao(item: dict[str, Any]) -> dict[str, Any]:
     return item.get("orgaoEntidade") or item.get("orgao") or {}
 
@@ -61,7 +70,7 @@ def map_pncp_item(item: dict[str, Any]) -> dict[str, Any]:
         "uf": unidade.get("ufSigla") or item.get("uf"),
         "municipio": unidade.get("municipioNome") or item.get("municipio"),
         "modalidade": modalidade,
-        "objeto_resumido": item.get("objetoCompra") or item.get("objeto"),
+        "objeto_resumido": _texto(item.get("objetoCompra") or item.get("objeto")),
         "valor_total_estimado": item.get("valorTotalEstimado"),
         "situacao": item.get("situacaoCompraNome") or item.get("situacao"),
         "data_publicacao": _parse_dt(item.get("dataPublicacaoPncp") or item.get("dataPublicacao")),

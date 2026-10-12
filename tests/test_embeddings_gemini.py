@@ -124,3 +124,29 @@ async def test_provedor_explicito_sem_chave_falha_claramente(monkeypatch):
     _config(monkeypatch, EMBEDDING_PROVIDER="openai")
     with pytest.raises(EmbeddingError, match="OPENAI_API_KEY"):
         await EmbeddingProvider(dimensions=2).embed(["a"])
+
+
+@pytest.mark.asyncio
+async def test_cota_diaria_esgotada_para_na_hora_com_mensagem_curta(monkeypatch):
+    _config(monkeypatch, GEMINI_API_KEY="g")
+    chamadas = []
+
+    def handler(req: httpx.Request) -> httpx.Response:
+        chamadas.append(1)
+        return httpx.Response(429, json={"error": {"code": 429, "message": "You exceeded your current quota, please check your plan.\nmais",
+                                                    "details": [{"violations": [{"quotaId": "EmbedContentRequestsPerDayPerProjectPerModel-FreeTier"}]},
+                                                                {"retryDelay": "30s"}]}})
+
+    _simular(monkeypatch, handler)
+    with pytest.raises(EmbeddingError, match="cota diária do Gemini esgotada"):
+        await EmbeddingProvider(dimensions=4, request_dimensions=True).embed(["a"])
+    assert len(chamadas) == 1  # esperar não adianta: não insiste
+
+
+@pytest.mark.asyncio
+async def test_erro_do_gemini_mostra_so_a_mensagem(monkeypatch):
+    _config(monkeypatch, GEMINI_API_KEY="g")
+    _simular(monkeypatch, lambda req: httpx.Response(400, json={"error": {"code": 400, "message": "API key not valid.\n{detalhes}"}}))
+    with pytest.raises(EmbeddingError) as exc:
+        await EmbeddingProvider(dimensions=4, request_dimensions=True).embed(["a"])
+    assert str(exc.value) == "Gemini respondeu 400: API key not valid."
