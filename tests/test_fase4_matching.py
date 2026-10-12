@@ -298,3 +298,27 @@ def test_advocacia_em_nome_de_lugar_nao_e_contratacao_de_advogado():
 
     assert "6911701" not in infer_cnaes_from_text("Reforma do prédio da Escola Superior da Advocacia")
     assert "6911701" in infer_cnaes_from_text("Contratação de sociedade de advogados para representação judicial")
+
+
+def test_mapa_casa_palavra_inteira_sem_acento_e_com_plural():
+    from src.matching.cnae_map import infer_cnaes_from_text as f
+
+    # falsos positivos reais do teste com a distribuidora de papelaria (BA, out/2026)
+    assert f("BRACADEIRA PARA INJECAO") == []  # "cadeira" dentro de "braçadeira"
+    assert f("módulos de folha de pagamento dos servidores") == []  # servidor público, não de rede
+    assert f("CONFECÇÃO E O FORNECIMENTO DE PRÓTESES DENTÁRIAS") == []
+    assert f("fornecimento de material e mão de obra") == []
+    assert "4647801" in f("resma de papel A4") and "4647801" in f("MATERIAL DE EXPEDIENTE")
+    assert "4751201" in f("Aquisição de computadores e impressoras") and "4751201" in f("servidores de rede")
+    assert "4639701" in f("AQUISICAO DE GENEROS ALIMENTICIOS")
+
+
+def test_cnae_principal_pesa_mais_que_secundario():
+    from src.matching.scoring import WEIGHT_CNAE, WEIGHT_CNAE_SECUNDARIO, score_match
+
+    empresa = {"uf": "BA", "porte": "DEMAIS", "cnae_fiscal": 4647801,
+               "cnaes_secundarios": [{"codigo": 4754701, "descricao": "Móveis"}]}
+    papelaria = score_match(tender={"uf": "BA", "cnaes_compativeis": ["4647801", "4761003"]}, company=empresa)
+    moveis = score_match(tender={"uf": "BA", "cnaes_compativeis": ["3101200", "4754701"]}, company=empresa)
+    assert papelaria.cnae == WEIGHT_CNAE and moveis.cnae == WEIGHT_CNAE_SECUNDARIO
+    assert papelaria.total > moveis.total

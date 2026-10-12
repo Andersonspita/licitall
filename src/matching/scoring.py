@@ -29,6 +29,9 @@ WEIGHT_DEADLINE = 15.0
 
 BID_THRESHOLD = 70.0
 TETO_RAMO_DESCONHECIDO = 45.0
+# Só CNAE secundário em comum: empresas registram muitos secundários (uma distribuidora de papelaria com 24, de móveis a
+# vestuário); a atividade principal é evidência mais forte de que o edital é do negócio dela.
+WEIGHT_CNAE_SECUNDARIO = 28.0
 # Ramo identificado por significado (sem CNAE): um pouco menos que CNAE compatível, que é evidência mais forte.
 WEIGHT_RAMO_SEMANTICO = 28.0
 REVIEW_THRESHOLD = 40.0
@@ -179,7 +182,12 @@ def _score_cnae(tender: dict[str, Any], company: dict[str, Any]) -> tuple[float,
     company_cnaes = _company_cnaes(company)
     if tender_cnaes and company_cnaes & tender_cnaes:
         overlap = sorted(company_cnaes & tender_cnaes)
-        return WEIGHT_CNAE, [f"CNAE compatível (+{WEIGHT_CNAE:.0f}): {', '.join(overlap[:4])}"]
+        principal = str(company.get("cnae_fiscal") or "")
+        if not principal or principal in tender_cnaes:
+            return WEIGHT_CNAE, [f"CNAE compatível (+{WEIGHT_CNAE:.0f}): {', '.join(overlap[:4])}"]
+        return WEIGHT_CNAE_SECUNDARIO, [
+            f"CNAE secundário compatível (+{WEIGHT_CNAE_SECUNDARIO:.0f}): {', '.join(overlap[:4])}"
+        ]
     if not tender_cnaes:
         ramo = tender.get("ramo_semantico") or {}
         if ramo.get("status") == "compativel":
