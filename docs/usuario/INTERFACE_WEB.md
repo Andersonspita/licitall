@@ -19,7 +19,7 @@ UI estática em `app/web/`, servida pelo FastAPI em **`/ui`**.
 | `/ui/edital.html?id=` | Explorador & análise | `GET /tenders/{id}` |
 | `/ui/perfis.html` | **Aderência ao perfil**: cadastro de perfis (UFs, faixa de valor, palavras, CATMAT/CATSER), teste com um edital e prévia do digest | `/matching/profiles*` |
 | `/ui/matchmaking.html` | Match por CNPJ (BID/REVIEW/SKIP) | `POST /matching/*` |
-| `/ui/certidoes.html` · `/ui/atestados.html` · `/ui/simulador.html` | Validade de certidões, banco de atestados e simulador de margem/lance | dados no navegador |
+| `/ui/certidoes.html` · `/ui/atestados.html` · `/ui/simulador.html` | Validade de certidões, banco de atestados e simulador de margem/lance | certidões e atestados salvos na conta da empresa |
 | `/ui/pecas.html?id=` | Hub de minutas + OAB | `POST /advisory/{id}/kit` |
 | `/ui/whatsapp.html` | Digest Evolution | editais reais + preview |
 | `/ui/rag.html` | Busca corpus Lei 14.133 | `GET /rag/search` |

@@ -256,27 +256,30 @@
     }
   }
 
-  // ---------- certidões (dados locais da tela Certidões) ----------
-  function carregarCertidoes() {
-    let itens = [];
-    try { itens = JSON.parse(localStorage.getItem("licitall_certidoes_v1") || "[]"); } catch { /* sem dados */ }
-    const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
-    const lista = (Array.isArray(itens) ? itens : []).filter((c) => c && c.validade).map((c) => ({
-      nome: c.nome, dias: Math.round((new Date(c.validade + "T00:00:00") - hoje) / DAY),
-    }));
+  // ---------- certidões (resumo calculado pelo servidor) ----------
+  async function carregarCertidoes() {
     const ul = $("lista-cert");
-    const venc = lista.filter((c) => c.dias < 0), breve = lista.filter((c) => c.dias >= 0 && c.dias <= 15);
-    if (!lista.length) {
-      $("k-cert").textContent = "—"; $("k-cert-sub").textContent = "informe as validades";
-      const li = el("li", "p-space-md font-body-sm text-on-surface-variant", "Nenhuma validade informada ainda. Cadastre as datas das certidões para ser avisado antes de vencerem.");
-      ul.replaceChildren(li); return;
+    let r;
+    try {
+      const res = await fetch("/certidoes/resumo");
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      r = await res.json();
+    } catch (e) {
+      $("k-cert").textContent = "—"; $("k-cert-sub").textContent = "indisponível";
+      ul.replaceChildren(el("li", "p-space-md font-body-sm text-error", "Não foi possível carregar as certidões (" + e.message + ")."));
+      return;
     }
-    const alerta = venc.length + breve.length;
+    const informadas = r.total - r.sem_data;
+    if (!informadas) {
+      $("k-cert").textContent = "—"; $("k-cert-sub").textContent = "informe as validades";
+      ul.replaceChildren(el("li", "p-space-md font-body-sm text-on-surface-variant", "Nenhuma validade informada ainda. Cadastre as datas das certidões para ser avisado antes de vencerem."));
+      return;
+    }
+    const alerta = r.vencida + r.vence_em_breve;
     $("k-cert").textContent = alerta ? String(alerta) : "Em dia";
-    $("k-cert").classList.toggle("text-error", venc.length > 0);
-    $("k-cert-sub").textContent = alerta ? venc.length + " vencida(s) · " + breve.length + " vencem em 15 dias" : lista.length + " documento(s) controlado(s)";
-    const mostrar = [...venc, ...breve].sort((a, b) => a.dias - b.dias).slice(0, 5);
-    ul.replaceChildren(...(mostrar.length ? mostrar : [{ nome: "Todos os documentos informados estão válidos", dias: null }]).map((c) => {
+    $("k-cert").classList.toggle("text-error", r.vencida > 0);
+    $("k-cert-sub").textContent = alerta ? r.vencida + " vencida(s) · " + r.vence_em_breve + " vencem em 15 dias" : informadas + " documento(s) controlado(s)";
+    ul.replaceChildren(...(r.atencao.length ? r.atencao : [{ nome: "Todos os documentos informados estão válidos", dias: null }]).map((c) => {
       const li = el("li", "p-space-md flex items-center justify-between gap-2");
       li.appendChild(el("span", "font-label-lg", c.nome));
       if (c.dias !== null) li.appendChild(el("span", "shrink-0 px-2 py-0.5 rounded font-label-md font-semibold " + (c.dias < 0 ? "bg-error-container text-on-error-container" : "bg-secondary-fixed text-on-secondary-fixed"), c.dias < 0 ? "vencida há " + Math.abs(c.dias) + " d" : c.dias === 0 ? "vence hoje" : "vence em " + c.dias + " d"));

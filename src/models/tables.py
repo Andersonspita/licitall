@@ -230,3 +230,44 @@ class Sessao(SQLModel, table=True):
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
     expires_at: datetime = Field(sa_column=Column(DateTime(timezone=True), nullable=False, index=True))
+
+
+class Certidao(SQLModel, table=True):
+    """Documento de regularidade da empresa (CND, FGTS, CNDT...) com a data de validade."""
+
+    __tablename__ = "certidoes"
+    __table_args__ = (UniqueConstraint("empresa_id", "nome", name="unq_certidao_empresa_nome"),)
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    empresa_id: uuid.UUID = Field(foreign_key="empresas.id", index=True, ondelete="CASCADE")
+    nome: str = Field(max_length=200)
+    validade: Optional[date] = None
+    observacao: Optional[str] = Field(default=None, max_length=500)
+    padrao: bool = False  # item da lista oficial; não pode ser removido
+    created_at: datetime = Field(
+        default_factory=_utcnow,
+        sa_column=Column(DateTime(timezone=True), nullable=False),
+    )
+    updated_at: datetime = Field(
+        default_factory=_utcnow,
+        sa_column=Column(DateTime(timezone=True), nullable=False),
+    )
+
+
+class Atestado(SQLModel, table=True):
+    """Atestado de capacidade técnica; a quantidade permite conferir exigências de editais."""
+
+    __tablename__ = "atestados"
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    empresa_id: uuid.UUID = Field(foreign_key="empresas.id", index=True, ondelete="CASCADE")
+    objeto: str = Field(max_length=300)
+    contratante: str = Field(max_length=200)
+    data_emissao: Optional[date] = None
+    quantidade: Optional[float] = None
+    unidade: Optional[str] = Field(default=None, max_length=20)
+    registro: Optional[str] = Field(default=None, max_length=120)  # nº da CAT / conselho
+    created_at: datetime = Field(
+        default_factory=_utcnow,
+        sa_column=Column(DateTime(timezone=True), nullable=False),
+    )

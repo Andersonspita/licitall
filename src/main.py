@@ -22,6 +22,7 @@ from src import __version__
 from src.agents.pipeline import TenderPipeline
 from src.auth.deps import current_user, guard
 from src.config.production import assert_production_ready
+from src.habilitacao.routes import atestados_router, certidoes_router
 from src.auth.routes import router as auth_router
 from src.config import get_settings
 from src.db import get_session, get_session_factory, init_db
@@ -109,6 +110,8 @@ app = FastAPI(
     openapi_url="/openapi.json" if get_settings().debug else None,
 )
 app.include_router(auth_router)
+app.include_router(certidoes_router)
+app.include_router(atestados_router)
 
 
 @app.middleware("http")

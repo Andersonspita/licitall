@@ -31,6 +31,8 @@ def get_session_factory() -> async_sessionmaker[AsyncSession]:
 
 async def init_db() -> None:
     from src.models.tables import (  # noqa: F401
+        Atestado,
+        Certidao,
         DigestSchedule,
         Empresa,
         Sessao,

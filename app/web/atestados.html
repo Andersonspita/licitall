@@ -31,6 +31,16 @@
     </div>
   </header>
 
+  <div id="importar" class="hidden bg-secondary-fixed text-on-secondary-fixed rounded p-space-md flex flex-col sm:flex-row sm:items-center justify-between gap-space-sm">
+    <p id="importar-txt" class="font-body-sm"></p>
+    <div class="flex gap-2 shrink-0">
+      <button id="importar-ok" type="button" class="px-3 py-1.5 rounded bg-secondary text-on-secondary font-label-md font-semibold hover:opacity-90">Importar para minha conta</button>
+      <button id="importar-no" type="button" class="px-3 py-1.5 rounded bg-surface-container-lowest text-on-surface font-label-md font-semibold hover:bg-surface-container">Descartar</button>
+    </div>
+  </div>
+
+  <p id="msg" role="alert" class="hidden bg-error-container text-on-error-container rounded p-space-sm font-body-sm"></p>
+
   <section class="bg-secondary-fixed rounded p-space-lg flex flex-col gap-space-md">
     <div>
       <h2 class="font-headline-sm text-headline-sm font-bold text-on-secondary-fixed">Conferir exigência do edital</h2>
@@ -84,11 +94,11 @@
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-space-md">
       <label class="flex flex-col gap-1.5 sm:col-span-2">
         <span class="font-label-sm font-semibold text-on-surface-variant">Objeto atestado *</span>
-        <input id="n-obj" type="text" maxlength="160" placeholder="Ex.: Execução de pavimentação asfáltica" class="rounded bg-surface-container-low px-3 py-2 font-body-sm focus:outline-none focus:ring-2 focus:ring-secondary">
+        <input id="n-obj" type="text" maxlength="300" placeholder="Ex.: Execução de pavimentação asfáltica" class="rounded bg-surface-container-low px-3 py-2 font-body-sm focus:outline-none focus:ring-2 focus:ring-secondary">
       </label>
       <label class="flex flex-col gap-1.5">
         <span class="font-label-sm font-semibold text-on-surface-variant">Contratante *</span>
-        <input id="n-cont" type="text" maxlength="120" class="rounded bg-surface-container-low px-3 py-2 font-body-sm focus:outline-none focus:ring-2 focus:ring-secondary">
+        <input id="n-cont" type="text" maxlength="200" class="rounded bg-surface-container-low px-3 py-2 font-body-sm focus:outline-none focus:ring-2 focus:ring-secondary">
       </label>
       <label class="flex flex-col gap-1.5">
         <span class="font-label-sm font-semibold text-on-surface-variant">Data de emissão</span>
@@ -100,33 +110,46 @@
       </label>
       <label class="flex flex-col gap-1.5">
         <span class="font-label-sm font-semibold text-on-surface-variant">Unidade</span>
-        <input id="n-un" type="text" maxlength="12" placeholder="m², un, h" class="rounded bg-surface-container-low px-3 py-2 font-body-sm focus:outline-none focus:ring-2 focus:ring-secondary">
+        <input id="n-un" type="text" maxlength="20" placeholder="m², un, h" class="rounded bg-surface-container-low px-3 py-2 font-body-sm focus:outline-none focus:ring-2 focus:ring-secondary">
       </label>
       <label class="flex flex-col gap-1.5 sm:col-span-2">
         <span class="font-label-sm font-semibold text-on-surface-variant">Registro no conselho / nº da CAT (se houver)</span>
-        <input id="n-reg" type="text" maxlength="80" placeholder="Ex.: CREA/UF nº …" class="rounded bg-surface-container-low px-3 py-2 font-body-sm focus:outline-none focus:ring-2 focus:ring-secondary">
+        <input id="n-reg" type="text" maxlength="120" placeholder="Ex.: CREA/UF nº …" class="rounded bg-surface-container-low px-3 py-2 font-body-sm focus:outline-none focus:ring-2 focus:ring-secondary">
       </label>
     </div>
-    <p id="n-erro" class="hidden text-error font-label-sm"></p>
+    <p id="n-erro" role="alert" class="hidden text-error font-label-sm"></p>
     <button type="submit" class="self-start flex items-center gap-2 px-4 py-2.5 rounded bg-secondary text-on-secondary font-label-md font-semibold hover:opacity-90 transition-opacity">
       <span class="material-symbols-outlined text-[18px]">add</span>Salvar atestado
     </button>
   </form>
 
   <p class="font-label-sm text-[11px] text-outline max-w-3xl">
-    Os dados ficam guardados neste navegador. A aceitação da soma de atestados e a comprovação de parcelas de maior relevância dependem das regras de cada edital — confira sempre o instrumento convocatório.
+    Os atestados ficam salvos na conta da sua empresa e são visíveis a todos os usuários dela. A aceitação da soma de atestados e a comprovação de parcelas de maior relevância dependem das regras de cada edital — confira sempre o instrumento convocatório.
   </p>
 </div>
 </div>
 <script>
-  const KEY = "licitall_atestados_v1";
+  const LEGADO = "licitall_atestados_v1";
   const $ = (id) => document.getElementById(id);
   const nf = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 3 });
   const norm = (s) => String(s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
 
   let itens = [];
-  try { itens = JSON.parse(localStorage.getItem(KEY) || "[]"); if (!Array.isArray(itens)) itens = []; } catch { itens = []; }
-  const salvar = () => { try { localStorage.setItem(KEY, JSON.stringify(itens)); } catch {} };
+  let total = 0;
+
+  async function api(url, options) {
+    const res = await fetch(url, { ...options, headers: { "Content-Type": "application/json" } });
+    const data = res.status === 204 ? null : await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const d = data && data.detail;
+      throw new Error(typeof d === "string" ? d : "Confira os dados informados.");
+    }
+    return data;
+  }
+  function mostrarErro(msg) {
+    $("msg").textContent = msg || "";
+    $("msg").classList.toggle("hidden", !msg);
+  }
 
   function fmtData(iso) {
     if (!iso) return "—";
@@ -145,16 +168,16 @@
     const f = norm($("filtro").value);
     const tb = $("lista");
     tb.innerHTML = "";
-    const vis = itens.filter((a) => !f || norm(a.obj + " " + a.cont).includes(f));
+    const vis = itens.filter((a) => !f || norm(a.objeto + " " + a.contratante).includes(f));
     vis.forEach((a) => {
       const tr = document.createElement("tr");
       tr.className = "hover:bg-surface-container-low transition-colors";
       tr.append(
-        td(a.obj, "font-label-lg"),
-        td(a.cont, "text-on-surface-variant"),
-        td(a.qtd != null ? nf.format(a.qtd) + (a.un ? " " + a.un : "") : "—", "text-right font-data-mono"),
-        td(fmtData(a.data), "text-on-surface-variant"),
-        td(a.reg || "—", "text-on-surface-variant")
+        td(a.objeto, "font-label-lg"),
+        td(a.contratante, "text-on-surface-variant"),
+        td(a.quantidade != null ? nf.format(a.quantidade) + (a.unidade ? " " + a.unidade : "") : "—", "text-right font-data-mono"),
+        td(fmtData(a.data_emissao), "text-on-surface-variant"),
+        td(a.registro || "—", "text-on-surface-variant")
       );
       const tdAc = document.createElement("td");
       tdAc.className = "px-4 py-3 text-right";
@@ -162,13 +185,14 @@
       b.type = "button";
       b.className = "px-2 py-1 rounded bg-surface-container text-on-surface-variant font-label-sm font-semibold hover:bg-error-container hover:text-on-error-container transition-colors";
       b.textContent = "Remover";
-      b.addEventListener("click", () => { itens = itens.filter((x) => x.id !== a.id); salvar(); renderLista(); conferir(); });
+      b.setAttribute("aria-label", "Remover atestado: " + a.objeto);
+      b.addEventListener("click", () => remover(a));
       tdAc.appendChild(b);
       tr.appendChild(tdAc);
       tb.appendChild(tr);
     });
     $("vazio").classList.toggle("hidden", itens.length > 0);
-    $("contador").textContent = itens.length === 0 ? "" : vis.length + " de " + itens.length + " atestado(s)";
+    $("contador").textContent = itens.length === 0 ? "" : vis.length + " de " + total + " atestado(s)";
   }
 
   function conferir() {
@@ -177,9 +201,9 @@
     const un = norm($("ex-un").value);
     const box = $("ex-res");
     if (!chave || !Number.isFinite(req) || req <= 0 || !un) { box.classList.add("hidden"); return; }
-    const comp = itens.filter((a) => a.qtd != null && norm(a.un) === un && norm(a.obj).includes(chave));
-    const soma = comp.reduce((s, a) => s + a.qtd, 0);
-    const maior = comp.reduce((m, a) => Math.max(m, a.qtd), 0);
+    const comp = itens.filter((a) => a.quantidade != null && norm(a.unidade) === un && norm(a.objeto).includes(chave));
+    const soma = comp.reduce((s, a) => s + a.quantidade, 0);
+    const maior = comp.reduce((m, a) => Math.max(m, a.quantidade), 0);
     const unTxt = $("ex-un").value.trim();
     box.innerHTML = "";
     box.classList.remove("hidden");
@@ -200,36 +224,88 @@
     box.append(l1, l2);
   }
 
+  // Carrega tudo (o filtro e a conferência rodam no navegador sobre a lista completa).
+  async function carregar(manterErro) {
+    try {
+      const d = await api("/atestados");
+      itens = d.itens;
+      total = d.total;
+      if (!manterErro) mostrarErro("");
+      renderLista();
+      conferir();
+      verificarLegado();
+    } catch (e) {
+      mostrarErro("Não foi possível carregar os atestados: " + e.message);
+    }
+  }
+
+  async function remover(a) {
+    if (!confirm("Remover o atestado “" + a.objeto + "”?")) return;
+    let falhou = false;
+    try { await api("/atestados/" + a.id, { method: "DELETE" }); } catch (e) { falhou = true; mostrarErro(e.message); }
+    await carregar(falhou);
+  }
+
+  // Dados que a versão anterior desta tela guardava só no navegador.
+  function lerLegado() {
+    try {
+      const raw = JSON.parse(localStorage.getItem(LEGADO) || "null");
+      return (Array.isArray(raw) ? raw : []).filter((x) => x && x.obj && x.cont);
+    } catch { return []; }
+  }
+  function limparLegado() { try { localStorage.removeItem(LEGADO); } catch { /* sem acesso ao armazenamento */ } }
+  function verificarLegado() {
+    const n = lerLegado().length;
+    $("importar").classList.toggle("hidden", n === 0);
+    if (n) $("importar-txt").textContent = "Encontramos " + n + (n === 1 ? " atestado salvo" : " atestados salvos") + " neste navegador. Importar para a conta da sua empresa?";
+  }
+  async function importarLegado() {
+    const falhas = [];
+    for (const l of lerLegado()) {
+      try {
+        await api("/atestados", { method: "POST", body: JSON.stringify({
+          objeto: l.obj, contratante: l.cont, data_emissao: l.data || null,
+          quantidade: Number.isFinite(l.qtd) ? l.qtd : null, unidade: l.un || null, registro: l.reg || null,
+        }) });
+      } catch (e) { falhas.push(l.obj + " (" + e.message + ")"); }
+    }
+    if (falhas.length) mostrarErro("Alguns atestados não foram importados e continuam salvos neste navegador: " + falhas.join("; "));
+    else limparLegado();
+    await carregar(falhas.length > 0);
+  }
+
   LicitAllShell.mount({
     active: "atestados",
     onReady() {
       ["ex-chave", "ex-qtd", "ex-un"].forEach((id) => $(id).addEventListener("input", conferir));
       $("filtro").addEventListener("input", renderLista);
-      $("form-novo").addEventListener("submit", (e) => {
+      $("importar-ok").addEventListener("click", importarLegado);
+      $("importar-no").addEventListener("click", () => { limparLegado(); verificarLegado(); });
+      $("form-novo").addEventListener("submit", async (e) => {
         e.preventDefault();
         const erro = $("n-erro");
-        const obj = $("n-obj").value.trim(), cont = $("n-cont").value.trim();
-        if (!obj || !cont) {
+        const objeto = $("n-obj").value.trim(), contratante = $("n-cont").value.trim();
+        if (!objeto || !contratante) {
           erro.textContent = "Informe o objeto e o contratante do atestado.";
           erro.classList.remove("hidden");
           return;
         }
         erro.classList.add("hidden");
         const q = parseFloat($("n-qtd").value);
-        itens.unshift({
-          id: "a" + Date.now(),
-          obj, cont,
-          data: $("n-data").value,
-          qtd: Number.isFinite(q) ? q : null,
-          un: $("n-un").value.trim(),
-          reg: $("n-reg").value.trim(),
-        });
-        salvar();
+        try {
+          await api("/atestados", { method: "POST", body: JSON.stringify({
+            objeto, contratante, data_emissao: $("n-data").value || null,
+            quantidade: Number.isFinite(q) ? q : null, unidade: $("n-un").value.trim() || null, registro: $("n-reg").value.trim() || null,
+          }) });
+        } catch (err) {
+          erro.textContent = err.message;
+          erro.classList.remove("hidden");
+          return;
+        }
         e.target.reset();
-        renderLista();
-        conferir();
+        await carregar(false);
       });
-      renderLista();
+      carregar(false);
     },
   });
 </script>

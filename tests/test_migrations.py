@@ -13,7 +13,11 @@ from sqlalchemy.engine import make_url
 from sqlalchemy.ext.asyncio import create_async_engine
 from sqlmodel import SQLModel
 
+from alembic.script import ScriptDirectory
+
 from src.db.migrate import BASELINE, alembic_config, migrate, schema_diff
+
+HEAD = ScriptDirectory.from_config(alembic_config()).get_current_head()
 
 BASE_URL = os.environ.get("TEST_DATABASE_URL", "postgresql+asyncpg://licitall:licitall@localhost:5433/licitall")
 
@@ -72,7 +76,7 @@ def banco():
 def test_migracoes_geram_exatamente_o_esquema_dos_modelos(banco):
     assert migrate(banco, strict=True) == "ok"
     assert schema_diff(banco) == []  # nenhuma coluna, índice ou chave a mais ou a menos
-    assert _query(banco, "select version_num from alembic_version") == [(BASELINE,)]
+    assert _query(banco, "select version_num from alembic_version") == [(HEAD,)]
 
 
 def test_migrar_de_novo_nao_muda_nada(banco):
@@ -104,7 +108,7 @@ def test_banco_legado_e_adotado_sem_perder_dados(banco):
 
     nota = migrate(banco, strict=True)
     assert nota.startswith("banco legado adotado")
-    assert _query(banco, "select version_num from alembic_version") == [(BASELINE,)]
+    assert _query(banco, "select version_num from alembic_version") == [(HEAD,)]
     assert _query(banco, "select id_pncp from tender_ingest") == [("x-1",)]
 
 
@@ -133,3 +137,13 @@ def test_banco_legado_divergente_so_avisa_fora_de_producao(banco):
 
     asyncio.run(quebrar())
     assert "divergências" in migrate(banco, strict=False)
+
+
+def test_banco_na_migracao_anterior_recebe_a_nova(banco):
+    """Um banco que já está em 0001 (produção existente) ganha as tabelas novas sem perder nada."""
+    command.upgrade(alembic_config(banco), BASELINE)
+    tabelas = {r[0] for r in _query(banco, "select table_name from information_schema.tables where table_schema='public'")}
+    assert "certidoes" not in tabelas and "atestados" not in tabelas
+    assert migrate(banco, strict=True) == "ok"
+    assert _query(banco, "select version_num from alembic_version") == [(HEAD,)]
+    assert schema_diff(banco) == []

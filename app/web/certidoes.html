@@ -30,6 +30,16 @@
     </div>
   </header>
 
+  <div id="importar" class="hidden bg-secondary-fixed text-on-secondary-fixed rounded p-space-md flex flex-col sm:flex-row sm:items-center justify-between gap-space-sm">
+    <p id="importar-txt" class="font-body-sm"></p>
+    <div class="flex gap-2 shrink-0">
+      <button id="importar-ok" type="button" class="px-3 py-1.5 rounded bg-secondary text-on-secondary font-label-md font-semibold hover:opacity-90">Importar para minha conta</button>
+      <button id="importar-no" type="button" class="px-3 py-1.5 rounded bg-surface-container-lowest text-on-surface font-label-md font-semibold hover:bg-surface-container">Descartar</button>
+    </div>
+  </div>
+
+  <p id="msg" role="alert" class="hidden bg-error-container text-on-error-container rounded p-space-sm font-body-sm"></p>
+
   <div id="resumo" class="grid grid-cols-2 lg:grid-cols-4 gap-space-md"></div>
 
   <section class="bg-surface-container-lowest rounded shadow-sm overflow-hidden">
@@ -60,7 +70,7 @@
     <form id="form-novo" class="p-space-md bg-surface-container-low border-t border-surface-container flex flex-col sm:flex-row gap-space-sm sm:items-end" novalidate>
       <label class="flex flex-col gap-1.5 flex-1">
         <span class="font-label-sm font-semibold text-on-surface-variant">Adicionar outro documento</span>
-        <input id="novo-nome" type="text" maxlength="80" placeholder="Ex.: Certidão de acervo técnico (CREA)" class="rounded bg-surface-container-lowest px-3 py-2 font-body-sm focus:outline-none focus:ring-2 focus:ring-secondary">
+        <input id="novo-nome" type="text" maxlength="200" autocomplete="off" placeholder="Ex.: Certidão de acervo técnico (CREA)" class="rounded bg-surface-container-lowest px-3 py-2 font-body-sm focus:outline-none focus:ring-2 focus:ring-secondary">
       </label>
       <button type="submit" class="flex items-center justify-center gap-2 px-4 py-2 rounded bg-secondary text-on-secondary font-label-md font-semibold hover:opacity-90 transition-opacity">
         <span class="material-symbols-outlined text-[18px]">add</span>Adicionar
@@ -69,132 +79,166 @@
   </section>
 
   <p class="font-label-sm text-[11px] text-outline max-w-3xl">
-    As datas são informadas e guardadas neste navegador. A consulta automática nos órgãos emissores (SICAF, PGFN, Caixa, TST) ainda não está integrada;
-    confira sempre a validade no site do emissor antes de enviar a habilitação.
+    As datas ficam salvas na conta da sua empresa e são visíveis a todos os usuários dela. A consulta automática nos órgãos emissores (SICAF, PGFN, Caixa, TST)
+    ainda não está integrada: confira sempre a validade no site do emissor antes de enviar a habilitação.
   </p>
 </div>
 </div>
 <script>
-  const KEY = "licitall_certidoes_v1";
-  const PADRAO = [
-    "SICAF — cadastro e regularidade",
-    "CND Federal (Receita/PGFN)",
-    "CND Estadual",
-    "CND Municipal",
-    "CRF — FGTS",
-    "CNDT — Débitos Trabalhistas",
-    "Certidão negativa de falência / recuperação judicial",
-  ];
+  const LEGADO = "licitall_certidoes_v1";
   const $ = (id) => document.getElementById(id);
-  const DAY = 86400000;
+  let itens = [];
 
-  function carregar() {
-    try {
-      const raw = JSON.parse(localStorage.getItem(KEY) || "null");
-      if (Array.isArray(raw) && raw.length) return raw;
-    } catch {}
-    return PADRAO.map((nome, i) => ({ id: "p" + i, nome, validade: "", custom: false }));
+  async function api(url, options) {
+    const res = await fetch(url, { ...options, headers: { "Content-Type": "application/json" } });
+    const data = res.status === 204 ? null : await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const d = data && data.detail;
+      throw new Error(typeof d === "string" ? d : "Confira os dados informados.");
+    }
+    return data;
   }
-  let itens = carregar();
-  function salvar() {
-    try { localStorage.setItem(KEY, JSON.stringify(itens)); } catch {}
+  const aviso = () => Math.min(90, Math.max(1, parseInt($("aviso-dias").value, 10) || 15));
+  function mostrarErro(msg) {
+    $("msg").textContent = msg || "";
+    $("msg").classList.toggle("hidden", !msg);
+  }
+  const plural = (n, a, b) => n + (Math.abs(n) === 1 ? " " + a : " " + b);
+  function el(tag, cls, text) {
+    const e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text !== undefined) e.textContent = text;
+    return e;
   }
 
-  function situacao(it, aviso) {
-    if (!it.validade) return { k: "sem", rotulo: "Não informada", cls: "bg-surface-container text-on-surface-variant" };
-    const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
-    const dias = Math.round((new Date(it.validade + "T00:00:00").getTime() - hoje.getTime()) / DAY);
-    if (dias < 0) return { k: "venc", rotulo: "Vencida há " + Math.abs(dias) + (Math.abs(dias) === 1 ? " dia" : " dias"), cls: "bg-error-container text-on-error-container" };
-    if (dias <= aviso) return { k: "breve", rotulo: dias === 0 ? "Vence hoje" : "Vence em " + dias + (dias === 1 ? " dia" : " dias"), cls: "bg-secondary-fixed text-on-secondary-fixed" };
-    return { k: "ok", rotulo: "Válida · " + dias + " dias", cls: "bg-tertiary-fixed text-on-tertiary-fixed" };
+  function rotulo(it) {
+    switch (it.situacao) {
+      case "vencida": return { t: "Vencida há " + plural(Math.abs(it.dias), "dia", "dias"), cls: "bg-error-container text-on-error-container" };
+      case "vence_em_breve": return { t: it.dias === 0 ? "Vence hoje" : "Vence em " + plural(it.dias, "dia", "dias"), cls: "bg-secondary-fixed text-on-secondary-fixed" };
+      case "valida": return { t: "Válida · " + it.dias + " dias", cls: "bg-tertiary-fixed text-on-tertiary-fixed" };
+      default: return { t: "Não informada", cls: "bg-surface-container text-on-surface-variant" };
+    }
   }
 
-  function render() {
-    const aviso = Math.max(1, parseInt($("aviso-dias").value, 10) || 15);
-    const cont = { ok: 0, breve: 0, venc: 0, sem: 0 };
-    const tb = $("lista");
-    tb.innerHTML = "";
-    itens.forEach((it) => {
-      const s = situacao(it, aviso);
-      cont[s.k]++;
-      const tr = document.createElement("tr");
-      tr.className = "hover:bg-surface-container-low transition-colors";
-
-      const tdNome = document.createElement("td");
-      tdNome.className = "px-4 py-3 font-label-lg";
-      tdNome.textContent = it.nome;
-
-      const tdData = document.createElement("td");
-      tdData.className = "px-4 py-3";
-      const inp = document.createElement("input");
+  function render(resumo) {
+    $("lista").replaceChildren(...itens.map((it) => {
+      const tr = el("tr", "hover:bg-surface-container-low transition-colors");
+      const inp = el("input", "rounded bg-surface-container-low px-2 py-1.5 font-body-sm focus:outline-none focus:ring-2 focus:ring-secondary");
       inp.type = "date";
-      inp.value = it.validade;
+      inp.value = it.validade || "";
       inp.setAttribute("aria-label", "Validade de " + it.nome);
-      inp.className = "rounded bg-surface-container-low px-2 py-1.5 font-body-sm focus:outline-none focus:ring-2 focus:ring-secondary";
-      inp.addEventListener("change", () => { it.validade = inp.value; salvar(); render(); });
+      inp.addEventListener("change", () => salvarData(it, inp));
+      const tdData = el("td", "px-4 py-3");
       tdData.appendChild(inp);
-
-      const tdSit = document.createElement("td");
-      tdSit.className = "px-4 py-3";
-      const badge = document.createElement("span");
-      badge.className = "inline-flex px-2 py-0.5 rounded font-label-sm font-bold " + s.cls;
-      badge.textContent = s.rotulo;
-      tdSit.appendChild(badge);
-
-      const tdAc = document.createElement("td");
-      tdAc.className = "px-4 py-3 text-right";
-      if (it.custom) {
-        const b = document.createElement("button");
+      const r = rotulo(it);
+      const tdSit = el("td", "px-4 py-3");
+      tdSit.appendChild(el("span", "inline-flex px-2 py-0.5 rounded font-label-sm font-bold " + r.cls, r.t));
+      const tdAc = el("td", "px-4 py-3 text-right");
+      if (!it.padrao) {
+        const b = el("button", "px-2 py-1 rounded bg-surface-container text-on-surface-variant font-label-sm font-semibold hover:bg-error-container hover:text-on-error-container transition-colors", "Remover");
         b.type = "button";
-        b.className = "px-2 py-1 rounded bg-surface-container text-on-surface-variant font-label-sm font-semibold hover:bg-error-container hover:text-on-error-container transition-colors";
-        b.textContent = "Remover";
-        b.addEventListener("click", () => { itens = itens.filter((x) => x.id !== it.id); salvar(); render(); });
+        b.addEventListener("click", () => remover(it));
         tdAc.appendChild(b);
       }
-      tr.append(tdNome, tdData, tdSit, tdAc);
-      tb.appendChild(tr);
-    });
-
+      tr.append(el("td", "px-4 py-3 font-label-lg", it.nome), tdData, tdSit, tdAc);
+      return tr;
+    }));
     const cards = [
-      ["Válidas", cont.ok, "text-on-tertiary-container", "check_circle"],
-      ["Vencem em breve", cont.breve, "text-secondary", "schedule"],
-      ["Vencidas", cont.venc, "text-error", "error"],
-      ["Sem data informada", cont.sem, "text-outline", "help"],
+      ["Válidas", resumo.valida, "text-on-tertiary-container", "check_circle"],
+      ["Vencem em breve", resumo.vence_em_breve, "text-secondary", "schedule"],
+      ["Vencidas", resumo.vencida, "text-error", "error"],
+      ["Sem data informada", resumo.sem_data, "text-outline", "help"],
     ];
-    $("resumo").innerHTML = "";
-    cards.forEach(([rot, n, cor, ic]) => {
-      const c = document.createElement("div");
-      c.className = "p-space-md rounded bg-surface-container-lowest shadow-sm flex items-center gap-3";
-      const i = document.createElement("span");
-      i.className = "material-symbols-outlined text-[28px] " + cor;
-      i.textContent = ic;
-      const w = document.createElement("div");
-      const v = document.createElement("div");
-      v.className = "font-headline-lg text-headline-lg leading-none";
-      v.textContent = String(n);
-      const l = document.createElement("div");
-      l.className = "font-label-sm text-on-surface-variant mt-1";
-      l.textContent = rot;
-      w.append(v, l);
+    $("resumo").replaceChildren(...cards.map(([rot, n, cor, ic]) => {
+      const c = el("div", "p-space-md rounded bg-surface-container-lowest shadow-sm flex items-center gap-3");
+      const i = el("span", "material-symbols-outlined text-[28px] " + cor, ic);
+      i.setAttribute("aria-hidden", "true");
+      const w = el("div");
+      w.append(el("div", "font-headline-lg text-headline-lg leading-none", String(n)), el("div", "font-label-sm text-on-surface-variant mt-1", rot));
       c.append(i, w);
-      $("resumo").appendChild(c);
-    });
+      return c;
+    }));
+  }
+
+  // Recarrega do servidor e preserva uma mensagem de erro já exibida.
+  async function carregar(manterErro) {
+    try {
+      const d = await api("/certidoes?aviso_dias=" + aviso());
+      itens = d.itens;
+      render(d.resumo);
+      if (!manterErro) mostrarErro("");
+      verificarLegado();
+    } catch (e) {
+      mostrarErro("Não foi possível carregar os documentos: " + e.message);
+    }
+  }
+
+  async function salvarData(it, inp) {
+    inp.disabled = true;
+    let falhou = false;
+    try {
+      await api("/certidoes/" + it.id, { method: "PUT", body: JSON.stringify({ validade: inp.value || null, observacao: it.observacao ?? null }) });
+    } catch (e) {
+      falhou = true;
+      mostrarErro("Não foi possível salvar a data de “" + it.nome + "”: " + e.message);
+    }
+    await carregar(falhou);
+  }
+
+  async function remover(it) {
+    if (!confirm("Remover “" + it.nome + "” da lista?")) return;
+    let falhou = false;
+    try { await api("/certidoes/" + it.id, { method: "DELETE" }); } catch (e) { falhou = true; mostrarErro(e.message); }
+    await carregar(falhou);
+  }
+
+  // Dados que a versão anterior desta tela guardava só no navegador.
+  function lerLegado() {
+    try {
+      const raw = JSON.parse(localStorage.getItem(LEGADO) || "null");
+      return (Array.isArray(raw) ? raw : []).filter((x) => x && x.nome && (x.validade || x.custom));
+    } catch { return []; }
+  }
+  function limparLegado() { try { localStorage.removeItem(LEGADO); } catch { /* sem acesso ao armazenamento */ } }
+  function verificarLegado() {
+    const n = lerLegado().length;
+    $("importar").classList.toggle("hidden", n === 0);
+    if (n) $("importar-txt").textContent = "Encontramos " + plural(n, "documento", "documentos") + " com datas salvas neste navegador. Importar para a conta da sua empresa?";
+  }
+  async function importarLegado() {
+    const falhas = [];
+    for (const l of lerLegado()) {
+      try {
+        let alvo = itens.find((i) => i.nome === l.nome);
+        if (!alvo) alvo = await api("/certidoes", { method: "POST", body: JSON.stringify({ nome: l.nome }) });
+        if (l.validade && !alvo.validade) {
+          await api("/certidoes/" + alvo.id, { method: "PUT", body: JSON.stringify({ validade: l.validade, observacao: alvo.observacao ?? null }) });
+        }
+      } catch (e) { falhas.push(l.nome + " (" + e.message + ")"); }
+    }
+    if (falhas.length) mostrarErro("Alguns itens não foram importados: " + falhas.join("; "));
+    else limparLegado();
+    await carregar(falhas.length > 0);
   }
 
   LicitAllShell.mount({
     active: "certidoes",
     onReady() {
-      $("aviso-dias").addEventListener("input", render);
-      $("form-novo").addEventListener("submit", (e) => {
+      $("aviso-dias").addEventListener("change", () => carregar(false));
+      $("importar-ok").addEventListener("click", importarLegado);
+      $("importar-no").addEventListener("click", () => { limparLegado(); verificarLegado(); });
+      $("form-novo").addEventListener("submit", async (e) => {
         e.preventDefault();
         const nome = $("novo-nome").value.trim();
         if (!nome) return;
-        itens.push({ id: "c" + Date.now(), nome, validade: "", custom: true });
-        $("novo-nome").value = "";
-        salvar();
-        render();
+        let falhou = false;
+        try {
+          await api("/certidoes", { method: "POST", body: JSON.stringify({ nome }) });
+          $("novo-nome").value = "";
+        } catch (err) { falhou = true; mostrarErro(err.message); }
+        await carregar(falhou);
       });
-      render();
+      carregar(false);
     },
   });
 </script>

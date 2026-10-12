@@ -156,6 +156,18 @@ Camada 3 (`src/matching/semantic.py`): texto do item sanitizado (remove `ITEM n`
 `GET /matching/profiles/{id}/digest` → matches `NOVO` com alerta agrupados por edital + mensagem pronta ("Prefeitura X (BA) — 23 itens compatíveis"). `POST /matching/profiles/{id}/digest/send` (`{ "phone": "55…" }`) envia pelo Evolution e só depois marca como `ENVIADO` (falha de envio → 502 e nada é marcado).  
 Não implementado: agendamento por dias da semana ou várias vezes ao dia.
 
+## Certidões e atestados (por empresa, exige login)
+
+| Método e rota | Função |
+|---------------|--------|
+| `GET /certidoes?aviso_dias=1..90` | Lista (cria a lista oficial se faltar) com `situacao` e `dias` + `resumo` |
+| `GET /certidoes/resumo` | Contagens e até 5 itens que pedem atenção |
+| `POST /certidoes` `{nome}` | Documento próprio (409 se repetido ou no limite de 200) |
+| `PUT /certidoes/{id}` `{validade, observacao}` | Atualiza a validade (422 fora do intervalo plausível) |
+| `DELETE /certidoes/{id}` | Remove documento próprio (409 para os da lista oficial) |
+| `GET /atestados?q=` | Lista e filtra por objeto/contratante |
+| `POST /atestados` · `PUT /atestados/{id}` · `DELETE /atestados/{id}` | CRUD (limite de 2000); recurso de outra empresa responde 404 |
+
 ## `POST /matching/search`
 
 Body: `{ "tender": { ...TenderSchema-like }, "limit": 30, "min_score": 40, "require_proximity": false }`.  
