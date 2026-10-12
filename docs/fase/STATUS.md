@@ -113,6 +113,10 @@ Tabelas `empresas`, `usuarios`, `sessoes`; login/cadastro/logout/me (`src/auth/`
 
 Tabelas `certidoes` e `atestados` (migração `0002`), por empresa: todos os usuários da empresa veem os mesmos dados; outra empresa recebe 404. A lista oficial de 7 certidões é criada sob demanda (idempotente); documentos próprios podem ser adicionados e removidos. A situação (válida / vence em breve / vencida / sem data) é calculada no servidor com a data de Brasília. Telas `certidoes.html` e `atestados.html` e o painel usam a API; dados antigos do navegador (`localStorage`) são oferecidos para importação e só são apagados depois de importados sem erro. Testes: `test_habilitacao_logic.py` e `test_habilitacao_integration.py`. Limite: a conferência de exigência do edital continua no navegador, sobre a lista da empresa.
 
+## Integração contínua (2026-10-12)
+
+`.github/workflows/ci.yml`: a cada push/PR sobe PostgreSQL com pgvector e roda `pytest tests` com `REQUIRE_DB=1` (sem banco o teste **falha**, em vez de pular). A primeira execução, com as dependências mais recentes, revelou duas incompatibilidades, já corrigidas: testes de ordem de rotas (agora usam `tests/_rotas.py`) e falso positivo do `schema_diff` com `UTCDateTime` do SQLModel novo. Localmente, sem `REQUIRE_DB`, os testes de banco continuam pulando se o Postgres estiver desligado. Limite: `requirements.txt` usa versões mínimas, então uma biblioteca nova pode quebrar a CI (e a imagem) sem mudança no código.
+
 ---
 
 ## Próxima ação recomendada
