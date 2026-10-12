@@ -129,6 +129,17 @@ A API de escrita do PNCP (`/api/pncp/v1/orgaos/.../itens` e `/arquivos`) ficou s
 
 **Problema:** o score semântico era 25 × cosseno bruto. Com o Gemini (512 dim) o cosseno entre textos *sem relação* tem mediana 0,76, então todo item ganhava ~19 dos 25 pontos e a camada deixava de discriminar. **Medição:** 240 itens reais do Compras.gov.br (setembro/2026, espalhados por 28 dias), rotulados por regras estritas de palavras em 5 categorias (papelaria, informática, obras, alimentos, saúde; 40 por categoria, exceto informática 28 e obras 12) + 80 neutros, contra um perfil por categoria. AUC geral 0,77 (informática 0,93, obras 0,87, papelaria 0,81, saúde 0,75, alimentos 0,73). **Ajuste:** `CALIBRACAO["gemini"] = (0,76, 0,86)` em `src/matching/semantic.py`: abaixo de 0,76 não pontua, a partir de 0,86 pontua 25. Resultado na amostra: item sem relação médio 2,3 pts (antes 19,0); relacionado médio 8,3 pts (antes 19,8). **Limites:** (1) os rótulos vêm de palavras, então a amostra favorece itens com termos explícitos e subestima o ganho do semântico em sinônimos; (2) pouca amostra de obras (12) e informática (28); (3) `openai` **não foi medido** e segue com cosseno bruto; (4) `hash` não muda; (5) trocar de modelo/dimensão exige remedir. O alerta (≥ 65) continua dependendo sobretudo de CATMAT e termos do perfil, já que o semântico agora só soma até 25.
 
+## Evolution / WhatsApp validado (2026-10-12)
+
+Evolution API v2.3.7 subida pelo Compose (`redis` + `evolution-api`; o `evolution-frontend` não sobe enquanto a porta 3001 estiver com o FreeLLMAPI, e o gerenciador do próprio Evolution fica em `/manager`). Instância `licitall` criada via API e conectada por QR. **Envio real confirmado** com `EvolutionClient.send_text`: mensagem de teste chegou ao WhatsApp do operador. **Digest validado de ponta a ponta** (sync BA → itens → embeddings Gemini → busca reversa → `POST /matching/profiles/{id}/digest/send`): 3 editais reais, 130 itens marcados `ENVIADO` só após o envio, mensagem recebida no WhatsApp. Com a sessão caída (`state: close`) o Evolution devolve 400 "Connection Closed" e a API responde 502 sem marcar nada. **Não testado:** entrega a número de terceiros.
+
+## Teste de ponta a ponta com dados reais (2026-10-12) — achados
+
+1. **Espelho Compras.gov.br atrasa semanas:** dos editais publicados em 14/09, 5 de 8 tinham itens; em 28/09, 1 de 8; em outubro, 0 de 8. Editais **abertos** são recentes, então hoje eles ficam sem itens enquanto a API do PNCP (`/itens`) estiver fora do ar; sem itens não há casamento. Os testes usaram editais de 8–14/09 (`only_open=false`).
+2. **Pontuação quase nunca alerta com dados reais (decisão pendente):** o item só é gravado com nota ≥ 40 e só alerta com ≥ 65. O CATMAT (40 pts) vem nulo em quase todos os itens, então o teto sem ele é 35 (léxico) + 25 (semântico) = 60 < 65. O léxico é proporcional (35 × termos achados ÷ termos do perfil): um perfil com 7 produtos e um item que casa com 1 ganha 5 pts. Perfil de alimentos com ~550 itens reais (maioria comida) gravou 0 oportunidades. Opções: reescalar o teto quando o item não tem CATMAT; dar crédito alto à primeira palavra e menos às seguintes; ou manter. **Nada foi alterado.**
+3. **Sem falsos alertas:** perfil de papelaria contra os mesmos 553 itens (sem nenhum item de papelaria) gravou 0 — a calibração do Gemini não infla notas.
+4. O servidor de teste usou usuário/perfis "E2E" e 1.458 editais da BA no banco local (limpar quando não forem mais necessários).
+
 ---
 
 ## Próxima ação recomendada
