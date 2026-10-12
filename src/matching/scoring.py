@@ -28,6 +28,7 @@ WEIGHT_ECONOMIC = 15.0
 WEIGHT_DEADLINE = 15.0
 
 BID_THRESHOLD = 70.0
+TETO_RAMO_DESCONHECIDO = 45.0
 REVIEW_THRESHOLD = 40.0
 
 
@@ -113,6 +114,11 @@ def score_match(
         # não tornam o edital relevante.
         total = REVIEW_THRESHOLD - 5
         explanations.append(f"Ramo incompatível (CNAE) → teto {total:.0f}, abaixo de revisar")
+    elif not tender.get("cnaes_compativeis") and total > TETO_RAMO_DESCONHECIDO:
+        # Ramo do edital não identificado (objeto genérico, sem itens): fica para revisão, nunca BID, e abaixo
+        # de qualquer edital de ramo compatível. Sem isso, UF + porte + valor + prazo davam BID a qualquer empresa.
+        total = TETO_RAMO_DESCONHECIDO
+        explanations.append(f"Ramo do edital não identificado → teto {total:.0f} (revisar manualmente)")
 
     if hard_fail and total >= REVIEW_THRESHOLD:
         total = min(total * 0.25, 35.0)

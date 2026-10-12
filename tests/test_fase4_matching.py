@@ -279,3 +279,22 @@ def test_servicos_juridicos_e_contabeis_tem_ramo_proprio():
     assert "6911701" in infer_cnaes_from_text("Contratação de escritório de advocacia")
     assert "6920601" in infer_cnaes_from_text("Prestação de serviços de assessoria contábil")
     assert "6911701" not in infer_cnaes_from_text("Serviços de consultoria em gestão")
+
+
+def test_ramo_desconhecido_nunca_e_bid_e_fica_abaixo_do_compativel():
+    from src.matching.scoring import BID_THRESHOLD, REVIEW_THRESHOLD, score_match
+
+    empresa = {"uf": "BA", "municipio": "SALVADOR", "porte": "DEMAIS", "cnae_fiscal": 6911701}
+    base = {"uf": "BA", "municipio": "SALVADOR", "valor_total_estimado": 150000,
+            "data_encerramento_propostas": (date.today() + timedelta(days=10)).isoformat()}
+    generico = score_match(tender={**base, "cnaes_compativeis": []}, company=empresa)  # "Aquisição de bens comuns"
+    compativel = score_match(tender={**base, "cnaes_compativeis": ["6911701"]}, company=empresa)
+    assert REVIEW_THRESHOLD <= generico.total < BID_THRESHOLD and generico.recommendation == "REVIEW"
+    assert compativel.recommendation == "BID" and compativel.total > generico.total
+
+
+def test_advocacia_em_nome_de_lugar_nao_e_contratacao_de_advogado():
+    from src.matching.cnae_map import infer_cnaes_from_text
+
+    assert "6911701" not in infer_cnaes_from_text("Reforma do prédio da Escola Superior da Advocacia")
+    assert "6911701" in infer_cnaes_from_text("Contratação de sociedade de advogados para representação judicial")
