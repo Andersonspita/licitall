@@ -242,6 +242,7 @@ async def execute_sync_job(job_id: str) -> None:
     ufs = resolve_ufs(job.uf)
     job.ufs_total = len(ufs)
     errors: list[str] = []
+    new_ids: list[str] = []
     ingested = 0
     ufs_ok = 0
 
@@ -296,7 +297,10 @@ async def execute_sync_job(job_id: str) -> None:
                                 for item in rows:
                                     if job.only_open and not is_open_for_proposals(item):
                                         continue
-                                    await upsert_tender(session, map_pncp_item(item))
+                                    mapped = map_pncp_item(item)
+                                    await upsert_tender(session, mapped)
+                                    if mapped.get("id_pncp"):
+                                        new_ids.append(mapped["id_pncp"])
                                     page_count += 1
                                     ingested += 1
                                 # Commit imediato → lista /tenders já reflete o progresso
@@ -354,6 +358,8 @@ async def execute_sync_job(job_id: str) -> None:
             job.message = f"Concluído Brasil · {ingested} editais · {len(ufs)} UFs"
         _append_log(job, job.message)
         await save_job(job)
+        if job.status in ("succeeded", "partial"):
+            await _reverse_match_after_sync(job, new_ids)
     except Exception as exc:
         job.status = "failed"
         job.error = f"{type(exc).__name__}: {exc}"
@@ -363,6 +369,36 @@ async def execute_sync_job(job_id: str) -> None:
         logger.exception("Sync job %s falhou", job_id)
     finally:
         _running_tasks.pop(job_id, None)
+
+
+async def _reverse_match_after_sync(job: SyncJob, id_pncps: list[str]) -> None:
+    """Dispara a busca reversa nos editais do sync; nunca faz o sync falhar."""
+    settings = get_settings()
+    if not settings.reverse_match_enabled or not id_pncps:
+        return
+    try:
+        from src.matching.reverse import run_reverse_match
+        from src.rag.embeddings import EmbeddingProvider
+
+        async with PncpClient() as client:
+            async with get_session_factory()() as session:
+                stats = await run_reverse_match(
+                    session,
+                    id_pncps=list(dict.fromkeys(id_pncps)),
+                    client=client,
+                    embedder=EmbeddingProvider(dimensions=512, request_dimensions=True),
+                    max_tenders=settings.reverse_match_max_tenders,
+                    delay=settings.reverse_match_delay_seconds,
+                )
+        _append_log(
+            job,
+            "Busca reversa: "
+            + ("sem perfis ativos" if stats["sem_perfis_ativos"] else f"{stats['editais_avaliados']} editais, {stats['matches_gravados']} matches"),
+        )
+    except Exception as exc:
+        _append_log(job, f"Busca reversa falhou (sync preservado): {type(exc).__name__}: {exc}")
+        logger.warning("Busca reversa falhou no job %s: %s", job.id, exc)
+    await save_job(job)
 
 
 def enqueue_sync_job(job_id: str) -> None:

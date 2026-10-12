@@ -1,4 +1,5 @@
 from src.compliance.lei_14133 import (
+    data_abertura_certame,
     ART_164_DIAS_UTEIS,
     ART_164_REF,
     LC123_COTA_RESERVADA_PCT,
@@ -12,6 +13,7 @@ from src.compliance.lei_14133 import (
 )
 
 __all__ = [
+    "data_abertura_certame",
     "ART_164_DIAS_UTEIS",
     "ART_164_REF",
     "LC123_COTA_RESERVADA_PCT",

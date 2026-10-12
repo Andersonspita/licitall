@@ -1,57 +1,76 @@
-/** Auth local (demo). Trocar por JWT/sessão FastAPI quando houver usuários reais. */
+/** Autenticação no navegador. A sessão vive em um cookie HttpOnly emitido pela API; aqui só se guarda o perfil em memória. */
 (function (global) {
-  const KEY = "licitall_session";
-  const DEMO = { email: "admin@licitall.local", password: "licitall", name: "Operador" };
+  const LOGIN = "/ui/login.html";
+  let me = null;
 
-  function read() {
-    try {
-      return JSON.parse(localStorage.getItem(KEY) || "null");
-    } catch {
-      return null;
+  // Resquício do login de protótipo (guardava a sessão em localStorage).
+  try { localStorage.removeItem("licitall_session"); } catch { /* sem acesso ao storage */ }
+
+  async function api(url, options) {
+    const res = await fetch(url, {
+      credentials: "same-origin",
+      ...options,
+      headers: { "Content-Type": "application/json", ...((options && options.headers) || {}) },
+    });
+    const data = res.status === 204 ? null : await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const d = data && data.detail;
+      const err = new Error(typeof d === "string" ? d : Array.isArray(d) ? "Confira os campos informados." : "Erro " + res.status);
+      err.status = res.status;
+      throw err;
     }
+    return data;
   }
 
-  function write(session) {
-    localStorage.setItem(KEY, JSON.stringify(session));
+  /** Só aceita destinos internos da interface (evita redirecionar o usuário para outro site). */
+  function safeNext(value) {
+    return typeof value === "string" && /^\/ui\/[A-Za-z0-9_\-./]*(\?[^\s]*)?(#[^\s]*)?$/.test(value) && !value.includes("//")
+      ? value
+      : "/ui/dashboard.html";
   }
 
-  const Auth = {
-    demoCredentials: DEMO,
-    getSession() {
-      return read();
-    },
-    isAuthenticated() {
-      const s = read();
-      return Boolean(s && s.email && s.expiresAt && Date.now() < s.expiresAt);
-    },
-    login(email, password) {
-      const ok =
-        (email === DEMO.email && password === DEMO.password) ||
-        (String(email || "").includes("@") && String(password || "").length >= 6);
-      if (!ok) {
-        throw new Error("Credenciais inválidas. Use admin@licitall.local / licitall");
-      }
-      const session = {
-        email: email.trim(),
-        name: email === DEMO.email ? DEMO.name : String(email).split("@")[0],
-        role: "Especialista em Licitações / GovOps",
-        expiresAt: Date.now() + 12 * 60 * 60 * 1000,
-      };
-      write(session);
-      return session;
-    },
-    logout() {
-      localStorage.removeItem(KEY);
-    },
-    requireAuth(loginUrl) {
-      if (!this.isAuthenticated()) {
-        const next = encodeURIComponent(location.pathname + location.search + location.hash);
-        location.replace((loginUrl || "/ui/login.html") + "?next=" + next);
-        return false;
-      }
-      return true;
-    },
+  function goLogin() {
+    const next = encodeURIComponent(location.pathname + location.search + location.hash);
+    location.replace(LOGIN + "?next=" + next);
+  }
+
+  // Sessão expirada em qualquer chamada da página: volta ao login em vez de mostrar erro solto.
+  const nativeFetch = global.fetch.bind(global);
+  global.fetch = async function (input, init) {
+    const res = await nativeFetch(input, init);
+    const url = typeof input === "string" ? input : (input && input.url) || "";
+    if (res.status === 401 && !url.includes("/auth/") && !location.pathname.endsWith("/login.html") && !location.pathname.endsWith("/cadastro.html")) {
+      me = null;
+      goLogin();
+    }
+    return res;
   };
 
-  global.LicitAllAuth = Auth;
+  global.LicitAllAuth = {
+    getSession() { return me; },
+    safeNext,
+    async refresh() {
+      try { me = await api("/auth/me"); } catch { me = null; }
+      return me;
+    },
+    async login(email, senha) {
+      me = await api("/auth/login", { method: "POST", body: JSON.stringify({ email, senha }) });
+      return me;
+    },
+    async register(dados) {
+      me = await api("/auth/register", { method: "POST", body: JSON.stringify(dados) });
+      return me;
+    },
+    async logout() {
+      try { await nativeFetch("/auth/logout", { method: "POST", credentials: "same-origin" }); } catch { /* segue para o login */ }
+      me = null;
+    },
+    async config() { return api("/auth/config"); },
+    /** true se há sessão válida; senão redireciona ao login. */
+    async requireAuth() {
+      if (await this.refresh()) return true;
+      goLogin();
+      return false;
+    },
+  };
 })(window);

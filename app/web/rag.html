@@ -35,9 +35,9 @@
     <h2 class="font-headline-sm font-bold">Busca semântica</h2>
     <form id="rag-search-form" class="flex flex-col sm:flex-row gap-2">
       <input id="rag-q" type="search" required placeholder="Ex.: impugnação prazo Art. 164 dias úteis"
-        class="flex-1 rounded bg-surface-container-low px-3 py-2 font-body-sm focus:outline-none focus:ring-2 focus:ring-secondary">
+        class="flex-1 rounded bg-surface-container-low px-3 py-2 font-body-sm focus:outline-none focus:ring-2 focus:ring-secondary" aria-label="Pergunta sobre a Lei 14.133">
       <input id="rag-top-k" type="number" value="5" min="1" max="20" title="top_k"
-        class="w-20 rounded bg-surface-container-low px-3 py-2 font-data-mono text-body-sm focus:outline-none focus:ring-2 focus:ring-secondary">
+        class="w-20 rounded bg-surface-container-low px-3 py-2 font-data-mono text-body-sm focus:outline-none focus:ring-2 focus:ring-secondary" aria-label="Quantidade de trechos">
       <button type="submit" class="flex items-center justify-center gap-2 px-4 py-2 rounded bg-secondary text-on-secondary font-label-md font-semibold">
         <span class="material-symbols-outlined text-[18px]">search</span>GET /rag/search
       </button>
@@ -45,7 +45,7 @@
     <div id="rag-hits" class="flex flex-col gap-2"></div>
   </div>
 
-  <div class="bg-surface-container-lowest p-space-lg rounded shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+  <div data-admin-only class="bg-surface-container-lowest p-space-lg rounded shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
     <div>
       <h2 class="font-headline-sm font-bold">Reindexar corpus</h2>
       <p class="font-body-sm text-on-surface-variant mt-1">POST /rag/index/lei-14133 — Lei + seed TCU</p>
@@ -93,7 +93,7 @@
         }
       });
 
-      document.getElementById("btn-index").addEventListener("click", async () => {
+      document.getElementById("btn-index")?.addEventListener("click", async () => {
         const pre = document.getElementById("index-result");
         pre.classList.remove("hidden");
         pre.textContent = "Indexando…";

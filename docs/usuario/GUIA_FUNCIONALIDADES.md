@@ -7,7 +7,7 @@ Regenerar: `python scripts/gerar_guia_pdf.py`
 
 1. `docker compose up -d`
 2. `uvicorn src.main:app --reload --port 8000`
-3. http://127.0.0.1:8000/ → login (`admin@licitall.local` / `licitall`)
+3. http://127.0.0.1:8000/ → login (crie a conta da empresa em `/ui/cadastro.html`)
 
 ## Dados reais
 

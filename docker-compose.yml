@@ -8,7 +8,13 @@
 #   ${LICITALL_EVOLUTION_PORT:-8081}  Evolution API (WhatsApp)
 #   ${LICITALL_EVOLUTION_UI_PORT:-3001} Evolution Manager (QR)
 #
-# A API FastAPI do LicitAll roda fora do Compose: uvicorn src.main:app --reload --port 8000
+# Todas as portas acima ficam presas a 127.0.0.1 (não ficam expostas na rede).
+#
+# Desenvolvimento: a API roda fora do Compose: uvicorn src.main:app --reload --port 8000
+# Produção (perfil "app"): docker compose --profile app up -d --build
+#   api   -> a aplicação (porta 8000 só na rede interna), aplica as migrações ao subir
+#   proxy -> Caddy com HTTPS automático nas portas ${HTTP_PORT:-80} e ${HTTPS_PORT:-443}
+# Guia completo: docs/usuario/OPERACAO_DOCKER.md
 
 name: licitall
 
@@ -18,7 +24,7 @@ services:
     container_name: licitall-postgres
     restart: unless-stopped
     ports:
-      - "${LICITALL_POSTGRES_PORT:-5433}:5432"
+      - "127.0.0.1:${LICITALL_POSTGRES_PORT:-5433}:5432"
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-licitall}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-licitall}
@@ -41,7 +47,7 @@ services:
     restart: unless-stopped
     command: ["redis-server", "--appendonly", "yes"]
     ports:
-      - "${LICITALL_REDIS_PORT:-6380}:6379"
+      - "127.0.0.1:${LICITALL_REDIS_PORT:-6380}:6379"
     volumes:
       - licitall_redis:/data
     healthcheck:
@@ -61,7 +67,7 @@ services:
       postgres:
         condition: service_healthy
     ports:
-      - "8001:8000"
+      - "127.0.0.1:8001:8000"
     environment:
       PORT: "8000"
       DATABASE_URL: postgres://${POSTGRES_USER:-licitall}:${POSTGRES_PASSWORD:-licitall}@postgres:5432/minhareceita?sslmode=disable
@@ -81,7 +87,7 @@ services:
       redis:
         condition: service_healthy
     ports:
-      - "${LICITALL_EVOLUTION_PORT:-8081}:8080"
+      - "127.0.0.1:${LICITALL_EVOLUTION_PORT:-8081}:8080"
     env_file:
       - ./docker/evolution.env
     environment:
@@ -104,13 +110,70 @@ services:
     depends_on:
       - evolution-api
     ports:
-      - "${LICITALL_EVOLUTION_UI_PORT:-3001}:80"
+      - "127.0.0.1:${LICITALL_EVOLUTION_UI_PORT:-3001}:80"
+    networks:
+      - licitall
+
+  api:
+    profiles: ["app"]
+    build:
+      context: .
+      args:
+        INSTALL_DOCLING: ${INSTALL_DOCLING:-false}
+    image: licitall-api:local
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      # Em produção a API RECUSA subir com senha/chave padrão, DEBUG ligado ou cookie sem HTTPS.
+      APP_ENV: ${APP_ENV:-production}
+      AUTO_CREATE_TABLES: "false"
+      DEBUG: "false"
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-licitall}:${POSTGRES_PASSWORD:-licitall}@postgres:5432/${POSTGRES_DB:-licitall}
+      REDIS_URL: redis://redis:6379/0
+      EVOLUTION_API_URL: http://evolution-api:8080
+      EVOLUTION_API_KEY: ${EVOLUTION_API_KEY:-licitall-dev-evolution-key}
+      EVOLUTION_INSTANCE: ${EVOLUTION_INSTANCE:-licitall}
+      MINHA_RECEITA_BASE_URL: http://minha-receita:8000
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ADMIN_EMAILS: ${ADMIN_EMAILS:-}
+      AUTH_REGISTRATION_OPEN: ${AUTH_REGISTRATION_OPEN:-true}
+      COOKIE_SECURE: ${COOKIE_SECURE:-true}
+      SESSION_TTL_HOURS: ${SESSION_TTL_HOURS:-12}
+      # A API só é alcançável pelo proxy (rede interna), então confia nos cabeçalhos dele (IP real do cliente).
+      FORWARDED_ALLOW_IPS: "*"
+    volumes:
+      - licitall_data:/app/data
+    networks:
+      - licitall
+
+  proxy:
+    profiles: ["app"]
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+    environment:
+      DOMAIN: ${DOMAIN:-localhost}
+    volumes:
+      - ./docker/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
     networks:
       - licitall
 
 volumes:
   licitall_pgdata:
   licitall_redis:
+  licitall_data:
+  caddy_data:
+  caddy_config:
   evolution_instances:
 
 networks:

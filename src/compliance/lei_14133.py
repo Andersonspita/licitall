@@ -97,6 +97,27 @@ def _as_date(value: date | datetime) -> date:
     return value
 
 
+def data_abertura_certame(tender: dict) -> date | None:
+    """Data de abertura do certame para contar o Art. 164.
+
+    O PNCP não informa a data da sessão pública; informa o início (`data_abertura_propostas`) e o fim
+    (`data_encerramento_propostas`) do recebimento de propostas, e a disputa começa quando ele termina.
+    Ordem: `data_abertura_certame` explícita (ex.: lida do edital) > encerramento das propostas >
+    início do recebimento (último recurso: antecipa o prazo, o que é o lado seguro).
+    """
+    for key in ("data_abertura_certame", "data_encerramento_propostas", "data_abertura_propostas"):
+        value = tender.get(key)
+        if not value:
+            continue
+        if isinstance(value, str):
+            try:
+                value = datetime.fromisoformat(value.replace("Z", "+00:00"))
+            except ValueError:
+                continue
+        return _as_date(value)
+    return None
+
+
 def prazo_impugnacao_art_164(
     data_abertura_certame: date | datetime,
     dias_uteis: int = ART_164_DIAS_UTEIS,

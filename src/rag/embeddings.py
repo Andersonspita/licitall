@@ -17,13 +17,18 @@ def tokenize(text: str) -> list[str]:
 class EmbeddingProvider:
     """OpenAI quando houver chave; senão embedding lexical determinístico (dev/testes)."""
 
-    def __init__(self, dimensions: int = 384) -> None:
+    def __init__(self, dimensions: int = 384, request_dimensions: bool = False) -> None:
         self.dimensions = dimensions
+        self.request_dimensions = request_dimensions
         self.settings = get_settings()
 
     @property
     def backend(self) -> str:
         return "openai" if self.settings.openai_api_key else "hash"
+
+    @property
+    def cache_key(self) -> str:
+        return f"{self.backend}:{self.dimensions}"
 
     async def embed(self, texts: list[str]) -> list[list[float]]:
         if not texts:
@@ -36,9 +41,11 @@ class EmbeddingProvider:
         from openai import AsyncOpenAI
 
         client = AsyncOpenAI(api_key=self.settings.openai_api_key)
+        kwargs = {"dimensions": self.dimensions} if self.request_dimensions else {}
         response = await client.embeddings.create(
             model=self.settings.embedding_model,
             input=texts,
+            **kwargs,
         )
         vectors = [list(item.embedding) for item in response.data]
         self.dimensions = len(vectors[0]) if vectors else self.dimensions

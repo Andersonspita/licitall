@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LicitAll — Criar conta</title>
+  <link rel="icon" href="/ui/assets/logo.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet">
+  <link href="/ui/assets/app.css" rel="stylesheet">
+  <script src="/ui/assets/tailwind-theme.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwind.config = window.__LICITALL_TW__;</script>
+  <script src="/ui/assets/auth.js"></script>
+</head>
+<body class="min-h-screen bg-background text-on-surface">
+  <main class="min-h-screen flex items-center justify-center p-6 sm:p-10">
+    <div class="w-full max-w-md">
+      <div class="mb-8 flex items-center gap-3">
+        <img src="/ui/assets/logo.svg" alt="" class="h-9 w-9">
+        <span class="font-headline-md text-headline-md tracking-tight">LicitAll</span>
+      </div>
+      <div class="la-paper rounded-xl p-6 sm:p-8 bg-surface-container-lowest">
+        <h1 class="font-headline-lg text-headline-lg tracking-tight">Criar conta da empresa</h1>
+        <p class="mt-1 font-body-md text-on-surface-variant">Cadastre sua empresa e o primeiro usuário. Cada empresa vê apenas os próprios perfis e oportunidades.</p>
+
+        <p id="fechado" class="hidden mt-6 p-3 rounded bg-error-container text-on-error-container font-body-sm">
+          O cadastro está fechado. Peça a criação da conta ao administrador da plataforma.
+        </p>
+
+        <form id="form" class="mt-6 flex flex-col gap-4" novalidate>
+          <label class="flex flex-col gap-1.5">
+            <span class="font-label-sm text-on-surface-variant font-semibold">Nome da empresa</span>
+            <input id="empresa" name="organization" type="text" required maxlength="200" autocomplete="organization"
+              class="w-full rounded bg-surface-container-low px-3 py-2.5 font-body-sm focus:outline-none focus:ring-2 focus:ring-secondary" placeholder="Razão social ou nome fantasia">
+          </label>
+          <label class="flex flex-col gap-1.5">
+            <span class="font-label-sm text-on-surface-variant font-semibold">Seu nome</span>
+            <input id="nome" name="name" type="text" required maxlength="120" autocomplete="name"
+              class="w-full rounded bg-surface-container-low px-3 py-2.5 font-body-sm focus:outline-none focus:ring-2 focus:ring-secondary" placeholder="Nome e sobrenome">
+          </label>
+          <label class="flex flex-col gap-1.5">
+            <span class="font-label-sm text-on-surface-variant font-semibold">E-mail</span>
+            <input id="email" name="email" type="email" required maxlength="254" autocomplete="username" inputmode="email" spellcheck="false"
+              class="w-full rounded bg-surface-container-low px-3 py-2.5 font-body-sm focus:outline-none focus:ring-2 focus:ring-secondary" placeholder="voce@empresa.com.br">
+          </label>
+          <label class="flex flex-col gap-1.5">
+            <span class="font-label-sm text-on-surface-variant font-semibold">Senha</span>
+            <input id="senha" name="new-password" type="password" required minlength="8" maxlength="128" autocomplete="new-password"
+              class="w-full rounded bg-surface-container-low px-3 py-2.5 font-body-sm focus:outline-none focus:ring-2 focus:ring-secondary" placeholder="Pelo menos 8 caracteres">
+          </label>
+          <label class="flex flex-col gap-1.5">
+            <span class="font-label-sm text-on-surface-variant font-semibold">Repita a senha</span>
+            <input id="senha2" name="confirm-password" type="password" required maxlength="128" autocomplete="new-password"
+              class="w-full rounded bg-surface-container-low px-3 py-2.5 font-body-sm focus:outline-none focus:ring-2 focus:ring-secondary">
+          </label>
+          <p id="erro" role="alert" class="hidden text-error font-label-sm"></p>
+          <button id="enviar" type="submit" class="w-full flex items-center justify-center gap-2 py-2.5 rounded bg-secondary text-on-secondary font-label-md font-semibold hover:opacity-90 transition-opacity">
+            <span class="material-symbols-outlined text-[18px]" aria-hidden="true">how_to_reg</span>Criar conta
+          </button>
+        </form>
+
+        <p class="mt-5 font-body-sm text-on-surface-variant">Já tem conta? <a class="text-secondary font-bold hover:underline" href="/ui/login.html">Entrar</a></p>
+        <p class="mt-4 font-label-sm text-[11px] text-outline leading-relaxed">
+          Minutas e pareceres gerados por IA são suporte técnico (Lei 8.906/1994) e exigem revisão humana.
+        </p>
+      </div>
+    </div>
+  </main>
+  <script>
+    const $ = (id) => document.getElementById(id);
+    LicitAllAuth.refresh().then((u) => { if (u) location.replace("/ui/dashboard.html"); });
+    LicitAllAuth.config().then((c) => {
+      if (!c.registro_aberto) { $("fechado").classList.remove("hidden"); $("form").classList.add("hidden"); }
+    }).catch(() => {});
+
+    $("form").addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      const erro = $("erro");
+      erro.classList.add("hidden");
+      const mostrar = (msg) => { erro.textContent = msg; erro.classList.remove("hidden"); };
+      if ($("senha").value !== $("senha2").value) return mostrar("As senhas não coincidem.");
+      if ($("senha").value.length < 8) return mostrar("A senha deve ter pelo menos 8 caracteres.");
+      $("enviar").disabled = true;
+      try {
+        await LicitAllAuth.register({
+          empresa_nome: $("empresa").value.trim(), nome: $("nome").value.trim(),
+          email: $("email").value.trim(), senha: $("senha").value,
+        });
+        location.href = "/ui/dashboard.html";
+      } catch (e) {
+        mostrar(e.message);
+      } finally {
+        $("enviar").disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

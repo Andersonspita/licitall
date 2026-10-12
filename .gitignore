@@ -45,3 +45,6 @@ evolution-api/
 Thumbs.db
 Desktop.ini
 .DS_Store
+
+# Backups do banco (contêm dados de clientes)
+backups/

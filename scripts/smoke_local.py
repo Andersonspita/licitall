@@ -124,14 +124,27 @@ def smoke_matching_score() -> None:
     _ok("Matching score", f"cnaes={cnaes[:3]} score={score}")
 
 
+async def _login(client, prefix: str) -> None:
+    """As rotas exigem login. Use SMOKE_EMAIL e SMOKE_PASSWORD (conta de operador) no ambiente."""
+    import os
+
+    email, senha = os.environ.get("SMOKE_EMAIL"), os.environ.get("SMOKE_PASSWORD")
+    if not (email and senha):
+        print("  [aviso] defina SMOKE_EMAIL e SMOKE_PASSWORD: sem login, as rotas protegidas respondem 401")
+        return
+    r = await client.post(f"{prefix}/auth/login", json={"email": email, "senha": senha})
+    r.raise_for_status()
+    _ok("login", email)
+
+
 async def smoke_api(base: str) -> None:
     import httpx
 
     async with httpx.AsyncClient(base_url=base.rstrip("/"), timeout=60.0) as client:
         health = await client.get("/health")
         health.raise_for_status()
-        data = health.json()
-        _ok("API /health", f"fase={data.get('fase')} marco={data.get('marco_legal')}")
+        _ok("API /health", f"versao={health.json().get('version')}")
+        await _login(client, "")
 
         idx = await client.post("/rag/index/lei-14133")
         if idx.status_code < 400:

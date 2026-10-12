@@ -30,9 +30,25 @@ def get_session_factory() -> async_sessionmaker[AsyncSession]:
 
 
 async def init_db() -> None:
-    from src.models.tables import TenderIngest  # noqa: F401
+    from src.models.tables import (  # noqa: F401
+        DigestSchedule,
+        Empresa,
+        Sessao,
+        Usuario,
+        EmbeddingCacheRow,
+        InterestProfile,
+        MatchItem,
+        ProfileDescription,
+        ProfileCatalogRule,
+        ProfileKeywordRule,
+        TenderAttachment,
+        TenderIngest,
+        TenderItemRow,
+    )
     from src.rag.store import LegalEmbedding  # noqa: F401
 
+    if not get_settings().auto_create_tables:
+        return
     async with get_engine().begin() as conn:
         await conn.run_sync(SQLModel.metadata.create_all)
         try:

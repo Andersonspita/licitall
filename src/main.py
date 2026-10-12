@@ -1,24 +1,37 @@
 from __future__ import annotations
 
+import asyncio
+import contextlib
 import logging
+import uuid
 from contextlib import asynccontextmanager
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
 from fastapi import Depends, FastAPI, HTTPException
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
+from sqlalchemy.exc import SQLAlchemyError
+from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 import httpx
 
 from pathlib import Path
 from src import __version__
 from src.agents.pipeline import TenderPipeline
+from src.auth.deps import current_user, guard
+from src.config.production import assert_production_ready
+from src.auth.routes import router as auth_router
 from src.config import get_settings
-from src.db import get_session, init_db
+from src.db import get_session, get_session_factory, init_db
 from src.ingestion.client import PncpClient, PncpError
-from src.ingestion.service import download_tender_documents, ingest_publicacoes
+from src.ingestion.service import (
+    download_tender_documents,
+    hydrate_attachments,
+    hydrate_items,
+    ingest_publicacoes,
+)
 from src.ingestion.jobs import (
     create_sync_job,
     default_date_window,
@@ -28,6 +41,23 @@ from src.ingestion.jobs import (
 from src.ingestion.storage import DocumentStorage
 from src.models.enums import DEFAULT_INGESTION_MODALITIES, ModalityEnum
 from src.matching.service import MatchmakingService
+from src.matching import profiles as profile_svc
+from src.matching.digest import build_digest_text, evolution_sender, group_matches, load_new_matches
+from src.matching.digest import send_digest as send_digest_core
+from src.matching.digest import mark_sent as mark_matches_sent
+from src.matching.scheduler import BRT, next_run, passed_today, normalize_phone, parse_horario, run_due_digests, scheduler_loop
+from src.matching.feedback import add_keyword, apply_feedback
+from src.matching.opportunities import MATCH_STATUSES, list_opportunities
+from src.matching.reverse import run_reverse_match
+from src.models.tables import (
+    DigestSchedule,
+    InterestProfile,
+    MatchItem,
+    TenderAttachment,
+    TenderIngest,
+    Usuario,
+)
+from src.rag.embeddings import EmbeddingProvider
 from src.advisory import CompanyContext, build_document_kit, persist_kit
 from src.outreach import DigestItem, DigestPayload, OutreachPayload, OutreachService
 from src.parser.service import ParserService
@@ -42,11 +72,25 @@ logger = logging.getLogger("licitall")
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
+    assert_production_ready(get_settings())
     try:
         await init_db()
     except Exception as exc:
         logger.warning("PostgreSQL indisponível na inicialização: %s", exc)
-    yield
+    settings = get_settings()
+    task = None
+    if settings.digest_scheduler_enabled:
+        task = asyncio.create_task(
+            scheduler_loop(get_session_factory(), evolution_sender, settings.digest_scheduler_interval_seconds),
+            name="digest-scheduler",
+        )
+    try:
+        yield
+    finally:
+        if task is not None:
+            task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await task
 
 
 app = FastAPI(
@@ -57,7 +101,25 @@ app = FastAPI(
     ),
     version=__version__,
     lifespan=lifespan,
+    # Toda rota exige login, salvo as públicas listadas em src/auth/security.py.
+    dependencies=[Depends(guard)],
+    # A documentação interativa lista todas as rotas: só no modo de desenvolvimento (DEBUG=true).
+    docs_url="/docs" if get_settings().debug else None,
+    redoc_url=None,
+    openapi_url="/openapi.json" if get_settings().debug else None,
 )
+app.include_router(auth_router)
+
+
+@app.middleware("http")
+async def security_headers(request, call_next):
+    response = await call_next(request)
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("Referrer-Policy", "same-origin")
+    if request.url.path.startswith("/auth"):
+        response.headers["Cache-Control"] = "no-store"
+    return response
 
 _UI_DIR = Path(__file__).resolve().parents[1] / "app" / "web"
 if _UI_DIR.is_dir():
@@ -124,13 +186,17 @@ class ParseResponse(BaseModel):
 
 @app.get("/health")
 async def health() -> dict[str, Any]:
+    return {"status": "ok", "version": __version__}
+
+
+@app.get("/health/detail")
+async def health_detail() -> dict[str, Any]:
     settings = get_settings()
     parser = ParserService().parser
     return {
         "status": "ok",
         "version": __version__,
         "marco_legal": "Lei Federal nº 14.133/2021",
-        "fase": "6-integracao-operacional",
         "docling_available": parser.docling_available,
         "legal_chunks": len(load_legal_corpus()),
         "raw_docs_dir": str(settings.raw_docs_path),
@@ -181,8 +247,10 @@ async def tenders_detail(
     """Detalhe de um edital + hints de arquivos em data/raw."""
     try:
         row = await get_tender(session, id_pncp)
-    except Exception as exc:
-        raise HTTPException(status_code=503, detail=f"Postgres indisponível: {exc}") from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except (SQLAlchemyError, OSError) as exc:
+        raise HTTPException(status_code=503, detail=f"Banco ou disco indisponível: {exc}") from exc
     if not row:
         raise HTTPException(status_code=404, detail=f"Edital não encontrado: {id_pncp}")
     return row
@@ -332,6 +400,55 @@ async def list_itens(id_pncp: str) -> dict[str, Any]:
     return {"id_pncp": id_pncp, "itens": itens}
 
 
+@app.post("/ingestion/pncp/{id_pncp:path}/itens/hydrate")
+async def hydrate_tender_items(
+    id_pncp: str,
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, Any]:
+    """Busca os itens no PNCP e grava em itens_contratacao (UPSERT idempotente)."""
+    try:
+        async with PncpClient() as client:
+            count = await hydrate_items(session, client, id_pncp)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except PncpError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    return {"id_pncp": id_pncp, "itens_gravados": count}
+
+
+@app.post("/ingestion/pncp/{id_pncp:path}/anexos/hydrate")
+async def hydrate_tender_attachments(
+    id_pncp: str,
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, Any]:
+    """Busca no PNCP os links dos arquivos do edital e grava em anexos_contratacao (idempotente)."""
+    try:
+        async with PncpClient() as client:
+            count = await hydrate_attachments(session, client, id_pncp)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except PncpError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    return {"id_pncp": id_pncp, "anexos_gravados": count}
+
+
+@app.get("/ingestion/pncp/{id_pncp:path}/anexos")
+async def list_tender_attachments(
+    id_pncp: str,
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, Any]:
+    """Lista os anexos já gravados (sem consultar o PNCP)."""
+    rows = (
+        await session.exec(
+            select(TenderAttachment).where(TenderAttachment.id_pncp == id_pncp).order_by(TenderAttachment.id)
+        )
+    ).all()
+    return {
+        "id_pncp": id_pncp,
+        "anexos": [{"titulo": a.titulo, "tipo": a.tipo_documento, "url": a.url_download} for a in rows],
+    }
+
+
 @app.get("/ingestion/modalidades")
 async def modalidades() -> dict[str, list[str]]:
     return {"modalidades": [item.value for item in DEFAULT_INGESTION_MODALITIES]}
@@ -464,6 +581,374 @@ class DigestFromCompanyRequest(BaseModel):
     company: dict[str, Any] | None = None
     send: bool = False
     instance: str | None = None
+
+
+async def owned_profile(session: AsyncSession, user: Usuario, profile_id: uuid.UUID) -> InterestProfile:
+    """Perfil da empresa do usuário. De outra empresa responde 404 (não revela que existe)."""
+    profile = await profile_svc.get_profile(session, profile_id)
+    if profile is None or profile.empresa_id != str(user.empresa_id):
+        raise HTTPException(status_code=404, detail="Perfil não encontrado")
+    return profile
+
+
+class ProfileCreateRequest(BaseModel):
+    empresa_id: str | None = Field(default=None, description="Ignorado: vem da sessão.")
+    nome_perfil: str = Field(min_length=1, max_length=100)
+    ufs_permitidas: list[str] = Field(
+        default_factory=list, description="Vazio = Brasil inteiro. Siglas de 2 letras."
+    )
+    valor_minimo_item: float = Field(default=0.0, ge=0)
+    valor_maximo_item: float | None = Field(default=None, ge=0)
+    apenas_me_epp: bool = False
+    palavras_obrigatorias: list[str] = Field(default_factory=list)
+    palavras_positivas: list[str] = Field(default_factory=list)
+    palavras_negativas: list[str] = Field(default_factory=list)
+    codigos_catalogo: list[int] = Field(default_factory=list, description="CATMAT/CATSER")
+    descricao_sintetica: str | None = Field(
+        default=None, description="Texto livre do que o cliente fornece (vira o vetor semântico do perfil)"
+    )
+
+
+class ProfileFilterRequest(BaseModel):
+    id_pncp: str
+
+
+@app.post("/matching/profiles", status_code=201)
+async def create_interest_profile(
+    body: ProfileCreateRequest,
+    session: AsyncSession = Depends(get_session),
+    user: Usuario = Depends(current_user),
+) -> dict[str, Any]:
+    if any(len(u.strip()) != 2 for u in body.ufs_permitidas):
+        raise HTTPException(status_code=422, detail="ufs_permitidas deve conter siglas de 2 letras")
+    if body.valor_maximo_item is not None and body.valor_maximo_item < body.valor_minimo_item:
+        raise HTTPException(status_code=422, detail="valor_maximo_item menor que valor_minimo_item")
+    profile = await profile_svc.create_profile(
+        session,
+        empresa_id=str(user.empresa_id),
+        nome_perfil=body.nome_perfil,
+        ufs_permitidas=[u.strip() for u in body.ufs_permitidas],
+        valor_minimo_item=body.valor_minimo_item,
+        valor_maximo_item=body.valor_maximo_item,
+        apenas_me_epp=body.apenas_me_epp,
+        palavras={
+            "OBRIGATORIA": body.palavras_obrigatorias,
+            "POSITIVA": body.palavras_positivas,
+            "NEGATIVA": body.palavras_negativas,
+        },
+        codigos_catalogo=body.codigos_catalogo,
+        descricao_sintetica=body.descricao_sintetica,
+    )
+    return await profile_svc.load_profile_view(session, profile)
+
+
+@app.get("/matching/profiles")
+async def list_interest_profiles(
+    session: AsyncSession = Depends(get_session),
+    user: Usuario = Depends(current_user),
+) -> dict[str, Any]:
+    items = [
+        await profile_svc.load_profile_view(session, p)
+        for p in await profile_svc.list_profiles(session, str(user.empresa_id))
+    ]
+    return {"perfis": items}
+
+
+@app.delete("/matching/profiles/{profile_id}", status_code=204, response_class=Response)
+async def delete_interest_profile(
+    profile_id: uuid.UUID,
+    session: AsyncSession = Depends(get_session),
+    user: Usuario = Depends(current_user),
+) -> Response:
+    profile = await owned_profile(session, user, profile_id)
+    await profile_svc.delete_profile(session, profile)
+    return Response(status_code=204)
+
+
+@app.post("/matching/profiles/{profile_id}/filter")
+async def filter_items_by_profile(
+    profile_id: uuid.UUID,
+    body: ProfileFilterRequest,
+    session: AsyncSession = Depends(get_session),
+    user: Usuario = Depends(current_user),
+) -> dict[str, Any]:
+    """Camada 1 (filtros rígidos): separa itens aprovados e descartados (com motivo)."""
+    profile = await owned_profile(session, user, profile_id)
+    result = await profile_svc.apply_hard_filters(session, profile, body.id_pncp)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Contratação não encontrada em tender_ingest")
+    if result["itens_total"] == 0:
+        raise HTTPException(
+            status_code=409,
+            detail="Contratação sem itens gravados; chame POST /ingestion/pncp/{id}/itens/hydrate",
+        )
+    return result
+
+
+@app.post("/matching/profiles/{profile_id}/candidates")
+async def candidates_by_profile(
+    profile_id: uuid.UUID,
+    body: ProfileFilterRequest,
+    session: AsyncSession = Depends(get_session),
+    user: Usuario = Depends(current_user),
+) -> dict[str, Any]:
+    """Camadas 1+2: filtros rígidos e pontuação CATMAT/léxica (parcial, máx. 75). Camada 3 pendente."""
+    profile = await owned_profile(session, user, profile_id)
+    result = await profile_svc.match_candidates(session, profile, body.id_pncp)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Contratação não encontrada em tender_ingest")
+    if result["itens_total"] == 0:
+        raise HTTPException(
+            status_code=409,
+            detail="Contratação sem itens gravados; chame POST /ingestion/pncp/{id}/itens/hydrate",
+        )
+    return result
+
+
+@app.post("/matching/profiles/{profile_id}/match")
+async def match_by_profile(
+    profile_id: uuid.UUID,
+    body: ProfileFilterRequest,
+    session: AsyncSession = Depends(get_session),
+    user: Usuario = Depends(current_user),
+) -> dict[str, Any]:
+    """Funil completo (Camadas 1–3): score 0–100; `alerta` verdadeiro a partir de 65."""
+    profile = await owned_profile(session, user, profile_id)
+    embedder = EmbeddingProvider(dimensions=512, request_dimensions=True)
+    try:
+        result = await profile_svc.match_full(session, profile, body.id_pncp, embedder)
+    except Exception as exc:
+        if exc.__class__.__module__.startswith("openai"):
+            raise HTTPException(status_code=502, detail=f"Falha no provedor de embeddings: {exc}") from exc
+        raise
+    if result is None:
+        raise HTTPException(status_code=404, detail="Contratação não encontrada em tender_ingest")
+    if result["itens_total"] == 0:
+        raise HTTPException(
+            status_code=409,
+            detail="Contratação sem itens gravados; chame POST /ingestion/pncp/{id}/itens/hydrate",
+        )
+    return result
+
+
+class ReverseRunRequest(BaseModel):
+    id_pncps: list[str] | None = Field(default=None, description="Editais a avaliar; vazio = os ingeridos nas últimas `since_hours`")
+    since_hours: int = Field(default=24, ge=1, le=720)
+
+
+class DigestSendRequest(BaseModel):
+    phone: str = Field(..., description="Número com DDI, ex.: 5511999999999")
+    top_n: int = Field(default=5, ge=1, le=15)
+    instance: str | None = None
+
+
+@app.post("/matching/reverse/run")
+async def run_reverse(
+    body: ReverseRunRequest,
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, Any]:
+    """Busca reversa: avalia editais contra todos os perfis ativos e grava em matches_itens."""
+    settings = get_settings()
+    ids = body.id_pncps
+    if not ids:
+        since = datetime.now(timezone.utc) - timedelta(hours=body.since_hours)
+        rows = await session.exec(select(TenderIngest.id_pncp).where(TenderIngest.created_at >= since))
+        ids = list(rows.all())
+    try:
+        async with PncpClient() as client:
+            return await run_reverse_match(
+                session,
+                id_pncps=ids,
+                client=client,
+                embedder=EmbeddingProvider(dimensions=512, request_dimensions=True),
+                max_tenders=settings.reverse_match_max_tenders,
+                delay=settings.reverse_match_delay_seconds,
+            )
+    except PncpError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+class FeedbackRequest(BaseModel):
+    relevante: bool
+
+
+class KeywordRequest(BaseModel):
+    tipo: str = Field(default="NEGATIVA", description="OBRIGATORIA, POSITIVA ou NEGATIVA")
+    termo: str = Field(min_length=1, max_length=100)
+
+
+@app.post("/matching/matches/{match_id}/feedback")
+async def match_feedback(
+    match_id: uuid.UUID,
+    body: FeedbackRequest,
+    session: AsyncSession = Depends(get_session),
+    user: Usuario = Depends(current_user),
+) -> dict[str, Any]:
+    """Relevante → FAVORITO. Irrelevante → DESCARTADO e devolve termos sugeridos para a lista negativa."""
+    match = await session.get(MatchItem, match_id)
+    owner = await session.get(InterestProfile, match.perfil_id) if match else None
+    if match is None or owner is None or owner.empresa_id != str(user.empresa_id):
+        raise HTTPException(status_code=404, detail="Oportunidade não encontrada")
+    return await apply_feedback(session, match, relevante=body.relevante)
+
+
+@app.post("/matching/profiles/{profile_id}/palavras")
+async def add_profile_keyword(
+    profile_id: uuid.UUID,
+    body: KeywordRequest,
+    session: AsyncSession = Depends(get_session),
+    user: Usuario = Depends(current_user),
+) -> dict[str, Any]:
+    """Acrescenta uma palavra ao perfil (padrão: negativa). Vale para os próximos matches."""
+    profile = await owned_profile(session, user, profile_id)
+    try:
+        added = await add_keyword(session, profile, body.tipo.upper(), body.termo)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return {"adicionada": added, "tipo": body.tipo.upper(), "termo": body.termo.strip()}
+
+
+class ScheduleRequest(BaseModel):
+    telefone: str = Field(..., description="Com DDI, ex.: 5571999999999")
+    horario: str = Field(default="08:00", description="HH:MM, horário de Brasília")
+    top_n: int = Field(default=5, ge=1, le=15)
+    ativo: bool = True
+    instance: str | None = None
+
+
+def _schedule_view(sch: DigestSchedule | None) -> dict[str, Any]:
+    if sch is None:
+        return {"configurado": False}
+    prox = next_run(sch.horario, datetime.now(timezone.utc), sch.ultimo_envio_dia)
+    return {
+        "configurado": True,
+        "telefone": sch.telefone,
+        "horario": sch.horario,
+        "top_n": sch.top_n,
+        "ativo": sch.ativo,
+        "ultimo_envio_dia": sch.ultimo_envio_dia.isoformat() if sch.ultimo_envio_dia else None,
+        "ultimo_status": sch.ultimo_status,
+        "proxima_execucao": prox.isoformat() if sch.ativo else None,
+    }
+
+
+@app.put("/matching/profiles/{profile_id}/agendamento")
+async def upsert_digest_schedule(
+    profile_id: uuid.UUID,
+    body: ScheduleRequest,
+    session: AsyncSession = Depends(get_session),
+    user: Usuario = Depends(current_user),
+) -> dict[str, Any]:
+    """Agenda o envio diário do digest por WhatsApp (horário de Brasília)."""
+    profile = await owned_profile(session, user, profile_id)
+    try:
+        parse_horario(body.horario)
+        phone = normalize_phone(body.telefone)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    sch = await session.get(DigestSchedule, profile_id)
+    now = datetime.now(timezone.utc)
+    if sch is None or sch.horario != body.horario:
+        # Novo horário: se o de hoje já passou, o primeiro envio é amanhã (sem mensagem imediata).
+        today = now.astimezone(BRT).date()
+        skip = passed_today(body.horario, now)
+        if sch is None:
+            sch = DigestSchedule(perfil_id=profile_id, telefone=phone, horario=body.horario)
+        sch.ultimo_envio_dia = today if skip else None
+    sch.telefone, sch.horario, sch.top_n = phone, body.horario, body.top_n
+    sch.ativo, sch.instance = body.ativo, body.instance
+    session.add(sch)
+    await session.commit()
+    await session.refresh(sch)
+    return _schedule_view(sch)
+
+
+@app.get("/matching/profiles/{profile_id}/agendamento")
+async def get_digest_schedule(
+    profile_id: uuid.UUID,
+    session: AsyncSession = Depends(get_session),
+    user: Usuario = Depends(current_user),
+) -> dict[str, Any]:
+    await owned_profile(session, user, profile_id)
+    return _schedule_view(await session.get(DigestSchedule, profile_id))
+
+
+@app.delete("/matching/profiles/{profile_id}/agendamento", status_code=204, response_class=Response)
+async def delete_digest_schedule(
+    profile_id: uuid.UUID,
+    session: AsyncSession = Depends(get_session),
+    user: Usuario = Depends(current_user),
+) -> Response:
+    await owned_profile(session, user, profile_id)
+    sch = await session.get(DigestSchedule, profile_id)
+    if sch is not None:
+        await session.delete(sch)
+        await session.commit()
+    return Response(status_code=204)
+
+
+@app.post("/matching/digest/run-due")
+async def run_due_now() -> dict[str, Any]:
+    """Executa agora os envios vencidos (o agendador já faz isso a cada minuto)."""
+    results = await run_due_digests(get_session_factory(), sender=evolution_sender)
+    return {"processados": len(results), "resultados": results}
+
+
+@app.get("/matching/profiles/{profile_id}/oportunidades")
+async def profile_opportunities(
+    profile_id: uuid.UUID,
+    pagina: int = 1,
+    tamanho: int = 20,
+    status: str | None = None,
+    apenas_alerta: bool = False,
+    desde: date | None = None,
+    uf: str | None = None,
+    session: AsyncSession = Depends(get_session),
+    user: Usuario = Depends(current_user),
+) -> dict[str, Any]:
+    """Oportunidades gravadas do perfil, da maior para a menor nota (máx. 100 por página)."""
+    profile = await owned_profile(session, user, profile_id)
+    if status is not None and status not in MATCH_STATUSES:
+        raise HTTPException(status_code=422, detail=f"status deve ser um de: {', '.join(MATCH_STATUSES)}")
+    return await list_opportunities(
+        session, profile, pagina=pagina, tamanho=tamanho, status=status,
+        apenas_alerta=apenas_alerta, desde=desde, uf=uf,
+    )
+
+
+@app.get("/matching/profiles/{profile_id}/digest")
+async def preview_profile_digest(
+    profile_id: uuid.UUID,
+    top_n: int = 5,
+    session: AsyncSession = Depends(get_session),
+    user: Usuario = Depends(current_user),
+) -> dict[str, Any]:
+    """Prévia do digest: matches NOVOS com alerta, agrupados por edital."""
+    profile = await owned_profile(session, user, profile_id)
+    groups = group_matches(await load_new_matches(session, profile))
+    return {
+        "perfil_id": str(profile.id),
+        "editais": len(groups),
+        "grupos": groups,
+        "mensagem": build_digest_text(profile.nome_perfil, groups, top_n=max(1, min(top_n, 15))),
+    }
+
+
+@app.post("/matching/profiles/{profile_id}/digest/send")
+async def send_profile_digest(
+    profile_id: uuid.UUID,
+    body: DigestSendRequest,
+    session: AsyncSession = Depends(get_session),
+    user: Usuario = Depends(current_user),
+) -> dict[str, Any]:
+    """Envia o digest por WhatsApp (Evolution) e só então marca os itens enviados como ENVIADO."""
+    profile = await owned_profile(session, user, profile_id)
+    try:
+        return await send_digest_core(
+            session, profile, phone=body.phone, top_n=body.top_n, instance=body.instance, sender=evolution_sender
+        )
+    except httpx.HTTPError as exc:
+        raise HTTPException(status_code=502, detail=f"Falha no envio WhatsApp: {exc}") from exc
 
 
 @app.post("/matching/search")

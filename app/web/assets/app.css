@@ -45,3 +45,25 @@ body {
 .animate-spin {
   animation: la-spin 1s linear infinite;
 }
+
+/* Acessibilidade: foco visível por teclado, toque sem atraso e respeito a "reduzir movimento" */
+:focus-visible {
+  outline: 2px solid var(--la-secondary);
+  outline-offset: 2px;
+}
+a, button, summary, label, select {
+  touch-action: manipulation;
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Números alinhados em colunas e valores (diretriz: tabular-nums) */
+.font-data-mono, td, th, input[type="number"] {
+  font-variant-numeric: tabular-nums;
+}

@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LicitAll — Simulador de lance</title>
+  <link rel="icon" href="/ui/assets/logo.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet">
+  <link href="/ui/assets/app.css" rel="stylesheet">
+  <script src="/ui/assets/tailwind-theme.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwind.config = window.__LICITALL_TW__;</script>
+  <script src="/ui/assets/auth.js"></script>
+  <script src="/ui/assets/shell.js"></script>
+</head>
+<body class="bg-background font-body-md text-body-md text-on-surface">
+<div id="app-root">
+<div data-page class="flex flex-col w-full gap-space-lg max-w-5xl">
+
+  <header class="bg-surface-container-lowest p-space-lg rounded shadow-sm flex items-start gap-3">
+    <span class="material-symbols-outlined text-secondary text-[32px] shrink-0">calculate</span>
+    <div>
+      <h1 class="font-headline-lg text-headline-lg tracking-tight">Simulador de margem e lance</h1>
+      <p class="font-body-sm text-on-surface-variant mt-1 max-w-2xl">
+        Descubra o menor preço que a sua empresa pode ofertar sem ter prejuízo (preço de corte) e teste lances durante a disputa.
+        Os valores de custo e carga tributária são informados por você — confirme as alíquotas com o seu contador.
+      </p>
+    </div>
+  </header>
+
+  <div class="grid grid-cols-1 lg:grid-cols-5 gap-space-lg items-start">
+
+    <form id="sim-form" class="lg:col-span-2 bg-surface-container-lowest p-space-lg rounded shadow-sm flex flex-col gap-space-md" novalidate>
+      <h2 class="font-headline-sm text-headline-sm font-bold">Dados do item ou lote</h2>
+
+      <label class="flex flex-col gap-1.5">
+        <span class="font-label-sm font-semibold text-on-surface-variant">Custo unitário do produto/serviço (R$)</span>
+        <input id="custo" type="number" min="0" step="0.01" placeholder="0,00" class="rounded bg-surface-container-low px-3 py-2 font-body-sm focus:outline-none focus:ring-2 focus:ring-secondary">
+      </label>
+      <label class="flex flex-col gap-1.5">
+        <span class="font-label-sm font-semibold text-on-surface-variant">Quantidade</span>
+        <input id="qtd" type="number" min="1" step="1" value="1" class="rounded bg-surface-container-low px-3 py-2 font-body-sm focus:outline-none focus:ring-2 focus:ring-secondary">
+      </label>
+      <label class="flex flex-col gap-1.5">
+        <span class="font-label-sm font-semibold text-on-surface-variant">Frete / deslocamento total (R$)</span>
+        <input id="frete" type="number" min="0" step="0.01" placeholder="0,00" class="rounded bg-surface-container-low px-3 py-2 font-body-sm focus:outline-none focus:ring-2 focus:ring-secondary">
+      </label>
+
+      <div class="grid grid-cols-2 gap-space-md">
+        <label class="flex flex-col gap-1.5">
+          <span class="font-label-sm font-semibold text-on-surface-variant">Tributos s/ receita (%)</span>
+          <input id="tributos" type="number" min="0" max="99" step="0.01" placeholder="0" class="rounded bg-surface-container-low px-3 py-2 font-body-sm focus:outline-none focus:ring-2 focus:ring-secondary">
+        </label>
+        <label class="flex flex-col gap-1.5">
+          <span class="font-label-sm font-semibold text-on-surface-variant">Outras despesas (%)</span>
+          <input id="despesas" type="number" min="0" max="99" step="0.01" placeholder="0" class="rounded bg-surface-container-low px-3 py-2 font-body-sm focus:outline-none focus:ring-2 focus:ring-secondary">
+        </label>
+      </div>
+      <p class="font-label-sm text-[11px] text-outline -mt-2">
+        Tributos: alíquota efetiva do seu regime (Simples Nacional, Lucro Presumido ou Real) incluindo ICMS/ISS, se houver. Outras despesas: comissões, garantias, etc.
+      </p>
+
+      <label class="flex flex-col gap-1.5">
+        <span class="font-label-sm font-semibold text-on-surface-variant">Margem mínima desejada (%)</span>
+        <input id="margem" type="number" min="0" max="99" step="0.01" placeholder="0" class="rounded bg-surface-container-low px-3 py-2 font-body-sm focus:outline-none focus:ring-2 focus:ring-secondary">
+      </label>
+      <label class="flex flex-col gap-1.5">
+        <span class="font-label-sm font-semibold text-on-surface-variant">Valor unitário estimado no edital (R$) — opcional</span>
+        <input id="estimado" type="number" min="0" step="0.01" placeholder="0,00" class="rounded bg-surface-container-low px-3 py-2 font-body-sm focus:outline-none focus:ring-2 focus:ring-secondary">
+      </label>
+
+      <button id="btn-limpar" type="button" class="flex items-center justify-center gap-2 py-2 rounded bg-surface-container text-on-surface font-label-md font-semibold hover:bg-surface-container-high transition-colors">
+        <span class="material-symbols-outlined text-[18px]">restart_alt</span>Limpar campos
+      </button>
+    </form>
+
+    <div class="lg:col-span-3 flex flex-col gap-space-lg">
+
+      <section class="bg-surface-container-lowest rounded shadow-sm overflow-hidden">
+        <div class="p-space-md bg-surface-container-low">
+          <h2 class="font-headline-sm text-headline-sm font-bold">Preço de corte</h2>
+          <span class="font-body-sm text-on-surface-variant">Menor valor que ainda cobre custos, tributos, despesas e a margem mínima.</span>
+        </div>
+        <div id="corte-vazio" class="p-space-lg text-on-surface-variant font-body-sm">
+          Informe ao menos o custo unitário para calcular.
+        </div>
+        <div id="corte-erro" class="hidden p-space-lg text-error font-body-sm"></div>
+        <div id="corte-ok" class="hidden p-space-lg grid grid-cols-1 sm:grid-cols-2 gap-space-md">
+          <div class="p-space-md rounded bg-secondary-fixed">
+            <span class="font-label-sm uppercase tracking-wider text-on-secondary-fixed font-bold">Preço mínimo unitário</span>
+            <div id="out-unit" class="mt-1 font-headline-xl text-headline-xl text-on-secondary-fixed leading-none">—</div>
+          </div>
+          <div class="p-space-md rounded bg-surface-container-low">
+            <span class="font-label-sm uppercase tracking-wider text-on-surface-variant font-bold">Valor total mínimo</span>
+            <div id="out-total" class="mt-1 font-headline-lg text-headline-lg leading-none">—</div>
+          </div>
+          <div class="p-space-md rounded bg-surface-container-low">
+            <span class="font-label-sm uppercase tracking-wider text-on-surface-variant font-bold">Lucro na margem mínima</span>
+            <div id="out-lucro" class="mt-1 font-headline-md text-headline-md leading-none">—</div>
+          </div>
+          <div id="box-desc" class="hidden p-space-md rounded bg-surface-container-low">
+            <span class="font-label-sm uppercase tracking-wider text-on-surface-variant font-bold">Desconto máximo sobre o estimado</span>
+            <div id="out-desc" class="mt-1 font-headline-md text-headline-md leading-none">—</div>
+            <p id="out-desc-nota" class="mt-1 font-label-sm text-[11px] text-on-surface-variant"></p>
+          </div>
+        </div>
+      </section>
+
+      <section class="bg-surface-container-lowest rounded shadow-sm overflow-hidden">
+        <div class="p-space-md bg-surface-container-low">
+          <h2 class="font-headline-sm text-headline-sm font-bold">Testar um lance</h2>
+          <span class="font-body-sm text-on-surface-variant">Digite o valor unitário que pretende ofertar e veja o resultado antes de enviar na sessão.</span>
+        </div>
+        <div class="p-space-lg flex flex-col gap-space-md">
+          <label class="flex flex-col gap-1.5 max-w-xs">
+            <span class="font-label-sm font-semibold text-on-surface-variant">Lance unitário (R$)</span>
+            <input id="lance" type="number" min="0" step="0.01" placeholder="0,00" class="rounded bg-surface-container-low px-3 py-2 font-body-sm focus:outline-none focus:ring-2 focus:ring-secondary">
+          </label>
+          <div id="lance-res" class="hidden rounded p-space-md flex flex-col gap-1"></div>
+        </div>
+      </section>
+
+      <p class="font-label-sm text-[11px] text-outline">
+        Cálculo: preço mínimo = (custo unitário + frete ÷ quantidade) ÷ (1 − tributos − despesas − margem).
+        Ferramenta de apoio à decisão; não substitui a análise contábil da empresa.
+      </p>
+    </div>
+  </div>
+</div>
+</div>
+<script>
+  const brl = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
+  const pct = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 2 });
+  const $ = (id) => document.getElementById(id);
+  const num = (id) => {
+    const v = parseFloat($(id).value);
+    return Number.isFinite(v) ? v : 0;
+  };
+
+  function calcular() {
+    const custo = num("custo"), qtd = Math.max(num("qtd"), 1), frete = num("frete");
+    const t = num("tributos") / 100, d = num("despesas") / 100, m = num("margem") / 100;
+    const estimado = num("estimado");
+    const vazio = $("corte-vazio"), erro = $("corte-erro"), ok = $("corte-ok");
+    [vazio, erro, ok].forEach((el) => el.classList.add("hidden"));
+    $("lance-res").classList.add("hidden");
+
+    if (custo <= 0) { vazio.classList.remove("hidden"); return null; }
+    const divisor = 1 - t - d - m;
+    if (divisor <= 0) {
+      erro.textContent = "Tributos + despesas + margem somam 100% ou mais da receita: não existe preço que cubra esses percentuais.";
+      erro.classList.remove("hidden");
+      return null;
+    }
+    const custoUnit = custo + frete / qtd;
+    const pmin = custoUnit / divisor;
+    $("out-unit").textContent = brl.format(pmin);
+    $("out-total").textContent = brl.format(pmin * qtd);
+    $("out-lucro").textContent = brl.format(pmin * qtd * m);
+    const box = $("box-desc");
+    if (estimado > 0) {
+      const desc = 1 - pmin / estimado;
+      box.classList.remove("hidden");
+      if (desc >= 0) {
+        $("out-desc").textContent = pct.format(desc * 100) + "%";
+        $("out-desc-nota").textContent = "Você pode dar lances até esse desconto sobre o valor estimado sem ficar abaixo da margem mínima.";
+      } else {
+        $("out-desc").textContent = "Inviável";
+        $("out-desc-nota").textContent = "O preço mínimo está acima do valor estimado pelo órgão: a disputa só compensa se a margem ou os custos mudarem.";
+      }
+    } else {
+      box.classList.add("hidden");
+    }
+    ok.classList.remove("hidden");
+    return { custoUnit, qtd, t, d, m, pmin };
+  }
+
+  function testarLance(base) {
+    const out = $("lance-res");
+    const lance = num("lance");
+    if (!base || lance <= 0) { out.classList.add("hidden"); return; }
+    const receita = lance * base.qtd;
+    const lucro = receita - base.custoUnit * base.qtd - receita * base.t - receita * base.d;
+    const margemReal = lucro / receita;
+    const acima = lance >= base.pmin;
+    out.className = "rounded p-space-md flex flex-col gap-1 " + (acima ? "bg-tertiary-fixed text-on-tertiary-fixed" : "bg-error-container text-on-error-container");
+    out.innerHTML = "";
+    const l1 = document.createElement("div");
+    l1.className = "font-label-lg font-bold";
+    l1.textContent = acima ? "Lance dentro da margem mínima" : (lucro >= 0 ? "Lance abaixo da margem mínima" : "Lance com prejuízo");
+    const l2 = document.createElement("div");
+    l2.className = "font-body-sm";
+    l2.textContent = "Resultado: " + brl.format(lucro) + " (" + pct.format(margemReal * 100) + "% sobre a receita de " + brl.format(receita) + ")";
+    out.append(l1, l2);
+  }
+
+  LicitAllShell.mount({
+    active: "simulador-lance",
+    onReady() {
+      const ids = ["custo", "qtd", "frete", "tributos", "despesas", "margem", "estimado", "lance"];
+      const refresh = () => testarLance(calcular());
+      ids.forEach((id) => $(id).addEventListener("input", refresh));
+      $("sim-form").addEventListener("submit", (e) => e.preventDefault());
+      $("btn-limpar").addEventListener("click", () => {
+        ids.forEach((id) => { $(id).value = id === "qtd" ? "1" : ""; });
+        refresh();
+      });
+      refresh();
+    },
+  });
+</script>
+</body>
+</html>

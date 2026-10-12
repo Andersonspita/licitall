@@ -13,6 +13,7 @@ from typing import Any, Literal
 from src.compliance.lei_14133 import (
     LC123_VALOR_EXCLUSIVO_ME_EPP,
     is_business_day,
+    data_abertura_certame,
     prazo_impugnacao_art_164,
 )
 from src.matching.client import PORTE_MAP
@@ -249,7 +250,7 @@ def _as_date(value: Any) -> date | None:
 
 
 def _score_deadline(tender: dict[str, Any], *, today: date) -> tuple[float, list[str]]:
-    abertura = _as_date(tender.get("data_abertura_propostas") or tender.get("data_abertura_certame"))
+    abertura = data_abertura_certame(tender)
     encerramento = _as_date(tender.get("data_encerramento_propostas"))
 
     if encerramento and encerramento < today:

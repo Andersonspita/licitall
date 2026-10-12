@@ -77,6 +77,9 @@ async def wait_deps(timeout_sec: int = 120) -> dict:
     return last
 
 
+import os
+
+
 async def smoke_api(api_base: str, id_pncp: str | None) -> None:
     import httpx
 
@@ -85,7 +88,14 @@ async def smoke_api(api_base: str, id_pncp: str | None) -> None:
         health = await client.get(f"{base}/health")
         health.raise_for_status()
         body = health.json()
-        _ok("/health", f"fase={body.get('fase')}")
+        _ok("/health", f"versao={body.get('version')}")
+        email, senha = os.environ.get("SMOKE_EMAIL"), os.environ.get("SMOKE_PASSWORD")
+        if email and senha:
+            login = await client.post(f"{base}/auth/login", json={"email": email, "senha": senha})
+            login.raise_for_status()
+            _ok("login", email)
+        else:
+            print("  [aviso] defina SMOKE_EMAIL e SMOKE_PASSWORD: sem login, as rotas protegidas respondem 401")
 
         deps = await client.get(f"{base}/health/deps")
         deps.raise_for_status()

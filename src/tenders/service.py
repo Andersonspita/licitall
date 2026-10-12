@@ -8,8 +8,7 @@ from typing import Any
 from sqlalchemy import func, or_, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from src.compliance.lei_14133 import is_business_day, prazo_impugnacao_art_164
-from src.config import get_settings
+from src.compliance.lei_14133 import data_abertura_certame, is_business_day, prazo_impugnacao_art_164
 from src.ingestion.storage import DocumentStorage
 from src.models.tables import TenderIngest
 
@@ -51,7 +50,12 @@ def dias_uteis_restantes(limite: date, *, hoje: date | None = None) -> int:
 
 
 def art164_meta(row: TenderIngest) -> dict[str, Any]:
-    abertura = _as_date(row.data_abertura_propostas)
+    abertura = data_abertura_certame(
+        {
+            "data_encerramento_propostas": row.data_encerramento_propostas,
+            "data_abertura_propostas": row.data_abertura_propostas,
+        }
+    )
     if not abertura:
         return {
             "tem_abertura": False,
@@ -69,13 +73,12 @@ def art164_meta(row: TenderIngest) -> dict[str, Any]:
         "dias_uteis_restantes": restantes,
         "critico": 0 < restantes <= 3,
         "vencido": restantes <= 0,
-        "fonte": "calculado_art_164",
+        "fonte": "calculado_art_164_encerramento_propostas",
     }
 
 
 def filesystem_hints(id_pncp: str) -> dict[str, Any]:
-    settings = get_settings()
-    storage = DocumentStorage(settings.raw_docs_path)
+    storage = DocumentStorage()
     try:
         files = [p.name for p in storage.list_files(id_pncp)]
     except Exception:
@@ -204,8 +207,8 @@ async def tender_stats(session: AsyncSession) -> dict[str, Any]:
     recent = (
         await session.execute(
             select(TenderIngest)
-            .where(TenderIngest.data_abertura_propostas.is_not(None))
-            .order_by(TenderIngest.data_abertura_propostas.asc())
+            .where(TenderIngest.data_encerramento_propostas.is_not(None))
+            .order_by(TenderIngest.data_encerramento_propostas.asc())
             .limit(500)
         )
     ).scalars().all()

@@ -95,7 +95,7 @@ def build() -> Path:
                 "Suba dependências: <b>docker compose up -d</b> (Postgres 5433, Redis 6380, Evolution 8081).",
                 "API: <b>uvicorn src.main:app --reload --port 8000</b>.",
                 "Abra <b>http://127.0.0.1:8000/</b> → login em /ui/login.html.",
-                "Credencial local de demo: <b>admin@licitall.local</b> / <b>licitall</b> (ou qualquer e-mail + senha ≥ 6).",
+                "Login de protótipo: informe qualquer e-mail válido e uma senha com 6 ou mais caracteres.",
                 "Documentação OpenAPI: <b>http://127.0.0.1:8000/docs</b>.",
             ],
             s["body"],

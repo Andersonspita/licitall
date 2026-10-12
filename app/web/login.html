@@ -25,8 +25,8 @@
           <span class="font-headline-md text-headline-md text-white tracking-tight">LicitAll</span>
         </div>
         <p class="mt-6 max-w-md text-white/80 font-body-md text-body-md leading-relaxed">
-          Automação do ciclo B2G: PNCP → Docling → LangGraph → matchmaking → minutas → WhatsApp.
-          Marco <strong class="text-white">Lei 14.133/2021</strong> com salvaguarda <strong class="text-white">OAB 8.906/1994</strong>.
+          Encontre licitações abertas compatíveis com a sua empresa, acompanhe prazos e documentos e prepare sua participação.
+          Baseado na <strong class="text-white">Lei 14.133/2021</strong>, com salvaguarda <strong class="text-white">OAB (Lei 8.906/1994)</strong>.
         </p>
       </div>
       <div class="relative z-10 grid gap-3 max-w-md">
@@ -52,34 +52,34 @@
           <span class="font-headline-md text-headline-md text-on-surface tracking-tight">LicitAll</span>
         </div>
         <div class="la-paper rounded-xl p-6 sm:p-8 bg-surface-container-lowest">
-          <span class="inline-flex px-2 py-0.5 rounded bg-secondary-fixed text-on-secondary-fixed font-label-sm text-label-sm uppercase tracking-wider font-bold">Acesso operacional</span>
+          <span class="inline-flex px-2 py-0.5 rounded bg-secondary-fixed text-on-secondary-fixed font-label-sm text-label-sm uppercase tracking-wider font-bold">Acesso à plataforma</span>
           <h1 class="mt-3 font-headline-lg text-headline-lg text-on-surface tracking-tight">Entrar no LicitAll</h1>
-          <p class="mt-1 font-body-md text-body-md text-on-surface-variant">Use suas credenciais GovOps para o painel Fase 6.</p>
+          <p class="mt-1 font-body-md text-body-md text-on-surface-variant">Use seu e-mail e sua senha para acessar o painel.</p>
 
           <form id="login-form" class="mt-6 flex flex-col gap-4" novalidate>
             <label class="flex flex-col gap-1.5">
               <span class="font-label-sm text-label-sm text-on-surface-variant font-semibold">E-mail</span>
-              <input id="email" type="email" required autocomplete="username"
+              <input id="email" type="email" required autocomplete="username" name="email" inputmode="email" spellcheck="false"
                 class="w-full rounded bg-surface-container-low px-3 py-2.5 text-on-surface font-body-sm focus:outline-none focus:ring-2 focus:ring-secondary"
-                placeholder="admin@licitall.local" value="admin@licitall.local">
+                placeholder="voce@empresa.com.br">
             </label>
             <label class="flex flex-col gap-1.5">
               <span class="font-label-sm text-label-sm text-on-surface-variant font-semibold">Senha</span>
-              <input id="password" type="password" required autocomplete="current-password"
+              <input id="password" type="password" required autocomplete="current-password" name="password"
                 class="w-full rounded bg-surface-container-low px-3 py-2.5 text-on-surface font-body-sm focus:outline-none focus:ring-2 focus:ring-secondary"
-                placeholder="••••••••" value="licitall">
+                placeholder="Sua senha">
             </label>
-            <p id="login-error" class="hidden text-error font-label-sm text-label-sm"></p>
+            <p id="login-error" role="alert" class="hidden text-error font-label-sm text-label-sm"></p>
             <button type="submit"
-              class="w-full flex items-center justify-center gap-2 py-2.5 rounded bg-secondary text-on-secondary font-label-md text-label-md font-semibold hover:bg-secondary-container hover:text-on-secondary-container transition-all shadow-sm">
+              class="w-full flex items-center justify-center gap-2 py-2.5 rounded bg-secondary text-on-secondary font-label-md text-label-md font-semibold hover:bg-secondary-container hover:text-on-secondary-container transition-colors shadow-sm">
               <span class="material-symbols-outlined text-[18px]">login</span>
-              Acessar dashboard
+              Entrar
             </button>
           </form>
 
-          <div class="mt-5 p-3 rounded bg-surface-container-low font-data-mono text-[11px] text-on-surface-variant">
-            Demo: <strong class="text-on-surface">admin@licitall.local</strong> / <strong class="text-on-surface">licitall</strong>
-          </div>
+          <p id="link-cadastro" class="hidden mt-5 font-body-sm text-on-surface-variant">
+            Ainda não tem conta? <a class="text-secondary font-bold hover:underline" href="/ui/cadastro.html">Criar conta da empresa</a>
+          </p>
           <p class="mt-4 font-label-sm text-[11px] text-outline leading-relaxed">
             Minutas e pareceres gerados por IA são suporte técnico (Lei 8.906/1994) e exigem revisão humana.
           </p>
@@ -88,24 +88,26 @@
     </section>
   </div>
   <script>
-    if (LicitAllAuth.isAuthenticated()) {
-      const params = new URLSearchParams(location.search);
-      location.replace(params.get("next") || "/ui/dashboard.html");
-    }
-    document.getElementById("login-form").addEventListener("submit", (ev) => {
+    const params = new URLSearchParams(location.search);
+    const destino = LicitAllAuth.safeNext(params.get("next"));
+    LicitAllAuth.refresh().then((u) => { if (u) location.replace(destino); });
+    LicitAllAuth.config().then((c) => { if (c.registro_aberto) document.getElementById("link-cadastro").classList.remove("hidden"); }).catch(() => {});
+
+    document.getElementById("login-form").addEventListener("submit", async (ev) => {
       ev.preventDefault();
       const err = document.getElementById("login-error");
+      const btn = ev.target.querySelector("button[type=submit]");
       err.classList.add("hidden");
+      btn.disabled = true;
       try {
-        LicitAllAuth.login(
-          document.getElementById("email").value,
-          document.getElementById("password").value
-        );
-        const params = new URLSearchParams(location.search);
-        location.href = params.get("next") || "/ui/dashboard.html";
+        await LicitAllAuth.login(document.getElementById("email").value, document.getElementById("password").value);
+        location.href = destino;
       } catch (e) {
-        err.textContent = e.message || "Falha no login";
+        err.textContent = e.message || "Não foi possível entrar.";
         err.classList.remove("hidden");
+        document.getElementById("password").focus();
+      } finally {
+        btn.disabled = false;
       }
     });
   </script>

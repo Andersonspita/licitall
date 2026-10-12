@@ -10,7 +10,7 @@ from typing import Any
 
 import yaml
 
-from src.compliance.lei_14133 import prazo_impugnacao_art_164
+from src.compliance.lei_14133 import data_abertura_certame, prazo_impugnacao_art_164
 from src.matching.client import PORTE_MAP, SITUACAO_ATIVA
 from src.matching.scoring import BID_THRESHOLD, REVIEW_THRESHOLD
 from src.models.enums import CompanySize
@@ -106,7 +106,7 @@ def evaluate_eligibility(
             detail=f"{company_uf or '?'} ≠ {tender_uf or '?'}",
         )
 
-    abertura = _as_date(tender.get("data_abertura_propostas") or tender.get("data_abertura_certame"))
+    abertura = data_abertura_certame(tender)
     encerramento = _as_date(tender.get("data_encerramento_propostas"))
 
     # prazo_propostas_aberto

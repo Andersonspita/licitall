@@ -74,9 +74,9 @@
       <span class="font-label-sm text-label-sm uppercase tracking-wider text-outline font-bold">Assinatura advogado(a)</span>
       <div class="mt-2 flex flex-col gap-2">
         <input id="oab-nome" type="text" placeholder="Nome completo · OAB/UF nº"
-          class="w-full rounded bg-surface-container-low px-2 py-1.5 font-body-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-secondary">
+          class="w-full rounded bg-surface-container-low px-2 py-1.5 font-body-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-secondary" aria-label="Nome e número da OAB do advogado">
         <input id="oab-data" type="date" value="2026-09-21"
-          class="w-full rounded bg-surface-container-low px-2 py-1.5 font-body-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-secondary">
+          class="w-full rounded bg-surface-container-low px-2 py-1.5 font-body-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-secondary" aria-label="Data da assinatura">
         <div class="h-12 rounded border-2 border-dashed border-outline/40 flex items-center justify-center font-label-sm text-outline">
           Área de assinatura digital
         </div>
@@ -177,7 +177,7 @@
           <span class="font-data-mono text-[10px] text-outline ml-2 px-2 py-0.5 rounded bg-surface-container">DRAFT · IA</span>
         </div>
       </div>
-      <div id="draft-editor" contenteditable="true" class="flex-1 p-space-lg font-body-sm leading-relaxed text-on-surface outline-none overflow-y-auto max-h-[520px]" spellcheck="false">
+      <div id="draft-editor" contenteditable="true" role="textbox" aria-multiline="true" aria-label="Rascunho da minuta" class="flex-1 p-space-lg font-body-sm leading-relaxed text-on-surface outline-none focus-visible:ring-2 focus-visible:ring-secondary focus-visible:ring-inset overflow-y-auto max-h-[520px]" spellcheck="false">
 <p class="text-on-surface-variant"><em>Editor vazio. Abra com <code>?id=</code> de um edital real, aceite o aviso OAB e clique em <strong>Gerar kit via API</strong>. O sistema não inventa cláusulas — a minuta sai do extract/RAG do edital selecionado.</em></p>
 <p style="margin-top:1.5em;padding:0.75em;border:1px dashed #8a8171;font-size:11px;color:#5c5548;"><strong>DISCLAIMER OAB (Lei 8.906/1994):</strong> Minuta gerada com suporte de inteligência artificial. Subsídio técnico preliminar — revisão, assinatura e protocolo são de responsabilidade do advogado habilitado.</p>
       </div>

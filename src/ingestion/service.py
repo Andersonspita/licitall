@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
 from sqlalchemy.dialects.postgresql import insert
@@ -14,7 +14,8 @@ from src.models.enums import (
     ModalityEnum,
     TenderStatus,
 )
-from src.models.tables import TenderIngest
+from src.agents.extractor import items_from_pncp
+from src.models.tables import TenderAttachment, TenderIngest, TenderItemRow
 
 _OPEN_STATUS_HINTS = ("publicado", "recebendo proposta", "divulgada")
 
@@ -72,11 +73,25 @@ def map_pncp_item(item: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def is_open_for_proposals(item: dict[str, Any]) -> bool:
+_BRT = timezone(timedelta(hours=-3))
+
+
+def is_open_for_proposals(item: dict[str, Any], now: datetime | None = None) -> bool:
+    """Aberto = situação de recebimento E prazo de propostas ainda no futuro.
+
+    Só a situação não basta: o PNCP mantém como "Divulgada" editais com prazo já vencido. Datas do
+    PNCP vêm sem fuso (horário de Brasília). Sem data de encerramento informada, não há como
+    afirmar que venceu, então o edital é aceito.
+    """
     situacao = str(item.get("situacaoCompraNome") or item.get("situacao") or "").lower()
-    if not situacao:
-        return True
-    return any(hint in situacao for hint in _OPEN_STATUS_HINTS)
+    if situacao and not any(hint in situacao for hint in _OPEN_STATUS_HINTS):
+        return False
+    encerramento = _parse_dt(item.get("dataEncerramentoProposta"))
+    if encerramento is not None:
+        referencia = now or datetime.now(_BRT).replace(tzinfo=None)
+        if encerramento <= referencia:
+            return False
+    return True
 
 
 async def upsert_tender(session: AsyncSession, mapped: dict[str, Any]) -> None:
@@ -144,3 +159,80 @@ async def download_tender_documents(
         path = await storage.save_bytes(parsed, filename, content)
         saved.append(str(path))
     return saved
+
+
+def _catalog_code(raw: dict[str, Any]) -> int | None:
+    for key in ("codigoItem", "codigoItemCatalogo", "codigoCatalogo", "catalogo"):
+        value = raw.get(key)
+        digits = "".join(ch for ch in str(value or "") if ch.isdigit())
+        if digits:
+            return int(digits)
+    return None
+
+
+def map_item_row(raw: dict[str, Any], id_pncp: str) -> dict[str, Any] | None:
+    """Converte um item bruto do PNCP em linha de `itens_contratacao`."""
+    base = items_from_pncp([raw])[0]
+    if base.numero_item <= 0:
+        return None
+    tipo = str(raw.get("materialOuServico") or "").strip().upper()[:1]
+    return {
+        "id_pncp": id_pncp,
+        "numero_item": base.numero_item,
+        "descricao": base.descricao,
+        "tipo": tipo if tipo in ("M", "S") else None,
+        "codigo_catmat_catser": _catalog_code(raw),
+        "quantidade": base.quantidade or None,
+        "unidade_medida": base.unidade_medida[:30],
+        "valor_unitario_estimado": base.valor_unitario_estimado or None,
+        "valor_total_estimado": base.valor_total_estimado or None,
+        "exclusivo_me_epp": base.exclusivo_me_epp,
+        "created_at": datetime.now(timezone.utc),
+    }
+
+
+async def hydrate_items(session: AsyncSession, client: PncpClient, id_pncp: str) -> int:
+    """Busca os itens da contratação no PNCP e grava de forma idempotente (UPSERT)."""
+    count = 0
+    for raw in await client.get_itens(id_pncp):
+        row = map_item_row(raw, id_pncp)
+        if row is None:
+            continue
+        stmt = insert(TenderItemRow).values(**row)
+        update = {k: getattr(stmt.excluded, k) for k in row if k not in ("id_pncp", "numero_item", "created_at")}
+        await session.execute(
+            stmt.on_conflict_do_update(constraint="unq_item_contratacao", set_=update)
+        )
+        count += 1
+    await session.commit()
+    return count
+
+
+def map_attachment_row(raw: dict[str, Any], id_pncp: str) -> dict[str, Any] | None:
+    """Converte um arquivo do PNCP em linha de `anexos_contratacao`; ignora os sem URL."""
+    url = raw.get("url") or raw.get("uri") or raw.get("urlDocumento")
+    if not url or not str(url).strip():
+        return None
+    titulo = raw.get("titulo") or raw.get("nome")
+    return {
+        "id_pncp": id_pncp,
+        "tipo_documento": (str(raw.get("tipoDocumentoNome") or raw.get("tipoDocumentoDescricao") or "").strip()[:100] or None),
+        "titulo": str(titulo).strip() if titulo else None,
+        "url_download": str(url).strip(),
+        "created_at": datetime.now(timezone.utc),
+    }
+
+
+async def hydrate_attachments(session: AsyncSession, client: PncpClient, id_pncp: str) -> int:
+    """Grava os links dos arquivos do edital (idempotente; só URL, sem baixar o conteúdo)."""
+    count = 0
+    for raw in await client.get_arquivos(id_pncp):
+        row = map_attachment_row(raw, id_pncp)
+        if row is None:
+            continue
+        stmt = insert(TenderAttachment).values(**row)
+        update = {k: getattr(stmt.excluded, k) for k in ("tipo_documento", "titulo")}
+        await session.execute(stmt.on_conflict_do_update(constraint="unq_anexo_contratacao", set_=update))
+        count += 1
+    await session.commit()
+    return count

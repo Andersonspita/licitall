@@ -111,14 +111,9 @@ def test_eligibility_yaml_loads_and_hard_fails_demais():
     assert any("exclusivo" in f.lower() or "ME/EPP" in f for f in verdict.hard_failures)
 
 
-def test_eligibility_art_164_soft_warning():
-    abertura = date.today() + timedelta(days=1)
-    verdict = evaluate_eligibility(
-        tender={
-            "uf": "SP",
-            "data_abertura_propostas": abertura.isoformat(),
-            "data_encerramento_propostas": (date.today() + timedelta(days=5)).isoformat(),
-        },
+def _verdict_164(**datas):
+    return evaluate_eligibility(
+        tender={"uf": "SP", **datas},
         company={
             "porte": "MICRO EMPRESA",
             "situacao_cadastral": 2,
@@ -127,10 +122,27 @@ def test_eligibility_art_164_soft_warning():
         },
         today=date.today(),
     )
-    assert verdict.eligible is True
-    assert any("Art. 164" in w or "164" in w for w in verdict.soft_warnings) or any(
-        "lead" in r for r in verdict.rules_applied
+
+
+def test_eligibility_art_164_alerta_quando_abertura_do_certame_e_proxima():
+    hoje = date.today()
+    verdict = _verdict_164(
+        data_abertura_certame=(hoje + timedelta(days=1)).isoformat(),
+        data_encerramento_propostas=(hoje + timedelta(days=5)).isoformat(),
     )
+    assert verdict.eligible is True
+    assert any("Art. 164" in w for w in verdict.soft_warnings)
+
+
+def test_eligibility_art_164_usa_encerramento_e_nao_o_inicio_das_propostas():
+    """O início do recebimento (ontem) não pode antecipar o prazo: a disputa abre quando ele encerra."""
+    hoje = date.today()
+    verdict = _verdict_164(
+        data_abertura_propostas=(hoje - timedelta(days=1)).isoformat(),
+        data_encerramento_propostas=(hoje + timedelta(days=15)).isoformat(),
+    )
+    assert verdict.eligible is True
+    assert not any("Art. 164" in w for w in verdict.soft_warnings)
 
 
 @pytest.mark.asyncio

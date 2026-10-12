@@ -43,9 +43,9 @@
         <div class="relative flex-1 max-w-xl">
           <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-[18px]">search</span>
           <input id="search-input" type="search" placeholder="Buscar ID PNCP, órgão, objeto…"
-            class="w-full bg-surface-container-lowest pl-10 pr-4 py-2 rounded text-on-surface font-body-sm focus:outline-none focus:ring-2 focus:ring-secondary shadow-sm">
+            class="w-full bg-surface-container-lowest pl-10 pr-4 py-2 rounded text-on-surface font-body-sm focus:outline-none focus:ring-2 focus:ring-secondary shadow-sm" aria-label="Buscar edital por ID, órgão ou objeto">
         </div>
-        <select id="filter-uf" class="px-3 py-2 rounded bg-surface-container-lowest font-label-sm text-on-surface shadow-sm">
+        <select id="filter-uf" class="px-3 py-2 rounded bg-surface-container-lowest font-label-sm text-on-surface shadow-sm" aria-label="Filtrar por UF">
           <option value="">Todas UFs</option>
           <option>AC</option><option>AL</option><option>AM</option><option>AP</option><option>BA</option>
           <option>CE</option><option>DF</option><option>ES</option><option>GO</option><option>MA</option>
@@ -54,7 +54,7 @@
           <option>RO</option><option>RR</option><option>RS</option><option>SC</option><option>SE</option>
           <option>SP</option><option>TO</option>
         </select>
-        <select id="filter-status" class="px-3 py-2 rounded bg-surface-container-lowest font-label-sm text-on-surface shadow-sm">
+        <select id="filter-status" class="px-3 py-2 rounded bg-surface-container-lowest font-label-sm text-on-surface shadow-sm" aria-label="Filtrar por situação">
           <option value="">Todos status</option>
           <option value="INGESTED">INGESTED</option>
           <option value="PARSED">PARSED</option>

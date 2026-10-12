@@ -29,6 +29,20 @@ class Settings(BaseSettings):
     pncp_timeout_seconds: float = 35.0
     pncp_page_size: int = 50
     pncp_page_retries: int = 4
+    reverse_match_enabled: bool = True
+    digest_scheduler_enabled: bool = True
+    app_env: str = "development"  # "production" liga a verificação de segredos fracos na subida
+    auto_create_tables: bool = True  # False em produção: o esquema vem só das migrações (Alembic)
+    # Autenticação
+    admin_emails: str = ""  # e-mails (separados por vírgula) que viram operadores da plataforma
+    auth_registration_open: bool = True  # False: só cria conta via scripts/criar_usuario.py
+    session_ttl_hours: int = 12
+    cookie_secure: bool = False  # True atrás de HTTPS
+    session_cookie_name: str = "licitall_sessao"
+    digest_scheduler_interval_seconds: int = 60
+    digest_retry_minutes: int = 15
+    reverse_match_max_tenders: int = 200
+    reverse_match_delay_seconds: float = 0.2
 
     minha_receita_base_url: str = "http://localhost:8001"
 

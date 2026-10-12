@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LicitAll — Aderência ao perfil</title>
+  <link rel="icon" href="/ui/assets/logo.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet">
+  <link href="/ui/assets/app.css" rel="stylesheet">
+  <script src="/ui/assets/tailwind-theme.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwind.config = window.__LICITALL_TW__;</script>
+  <script src="/ui/assets/auth.js"></script>
+  <script src="/ui/assets/shell.js"></script>
+</head>
+<body class="bg-background font-body-md text-body-md text-on-surface">
+<div id="app-root">
+<div data-page class="flex flex-col w-full gap-space-lg max-w-5xl">
+
+  <header class="bg-surface-container-lowest p-space-lg rounded shadow-sm flex items-start gap-3">
+    <span class="material-symbols-outlined text-secondary text-[32px] shrink-0">tune</span>
+    <div>
+      <h1 class="font-headline-lg text-headline-lg tracking-tight">Aderência ao perfil</h1>
+      <p class="font-body-sm text-on-surface-variant mt-1 max-w-2xl">
+        Descreva o que a sua empresa fornece. O sistema avalia cada item dos editais abertos contra os seus perfis
+        e avisa só quando houver aderência. Uma empresa pode ter vários perfis (ex.: linha hospitalar e linha escolar).
+      </p>
+    </div>
+  </header>
+
+  <section>
+    <h2 class="font-headline-sm text-headline-sm font-bold mb-space-sm">Seus perfis</h2>
+    <div id="lista" class="flex flex-col gap-space-md"></div>
+    <div id="lista-vazia" class="hidden bg-surface-container-lowest rounded p-space-lg text-on-surface-variant font-body-sm shadow-sm">
+      Você ainda não tem perfis. Cadastre o primeiro abaixo.
+    </div>
+  </section>
+
+  <form id="form" class="bg-surface-container-lowest p-space-lg rounded shadow-sm flex flex-col gap-space-md" novalidate>
+    <h2 class="font-headline-sm text-headline-sm font-bold">Novo perfil</h2>
+
+    <label class="flex flex-col gap-1.5">
+      <span class="font-label-sm font-semibold text-on-surface-variant">Nome do perfil *</span>
+      <input id="f-nome" type="text" maxlength="100" placeholder="Ex.: Material de escritório" class="rounded bg-surface-container-low px-3 py-2 font-body-sm focus:outline-none focus:ring-2 focus:ring-secondary">
+    </label>
+
+    <div class="flex flex-col gap-1.5">
+      <div class="flex items-center justify-between">
+        <span class="font-label-sm font-semibold text-on-surface-variant">Estados atendidos</span>
+        <span class="flex gap-2">
+          <button type="button" id="ufs-todas" class="font-label-sm text-secondary font-bold hover:underline">Marcar todos</button>
+          <button type="button" id="ufs-limpar" class="font-label-sm text-on-surface-variant font-bold hover:underline">Limpar</button>
+        </span>
+      </div>
+      <div id="ufs" class="grid grid-cols-9 sm:grid-cols-14 gap-1.5" style="grid-template-columns: repeat(auto-fill, minmax(46px, 1fr));"></div>
+      <p id="ufs-dica" class="font-label-sm text-[11px] text-outline"></p>
+    </div>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-space-md">
+      <label class="flex flex-col gap-1.5">
+        <span class="font-label-sm font-semibold text-on-surface-variant">Valor unitário mínimo do item (R$)</span>
+        <input id="f-min" type="number" min="0" step="0.01" placeholder="0,00" class="rounded bg-surface-container-low px-3 py-2 font-body-sm focus:outline-none focus:ring-2 focus:ring-secondary">
+      </label>
+      <label class="flex flex-col gap-1.5">
+        <span class="font-label-sm font-semibold text-on-surface-variant">Valor unitário máximo do item (R$)</span>
+        <input id="f-max" type="number" min="0" step="0.01" placeholder="sem limite" class="rounded bg-surface-container-low px-3 py-2 font-body-sm focus:outline-none focus:ring-2 focus:ring-secondary">
+      </label>
+    </div>
+    <label class="flex items-center gap-2">
+      <input id="f-me" type="checkbox" class="accent-secondary w-4 h-4">
+      <span class="font-label-md">Só itens exclusivos para ME/EPP (LC 123/2006)</span>
+    </label>
+
+    <div class="flex flex-col gap-1.5">
+      <span class="font-label-sm font-semibold text-on-surface-variant">Palavras que o item deve ter (obrigatórias)</span>
+      <div id="t-obrig"></div>
+      <p class="font-label-sm text-[11px] text-outline">Se faltar qualquer uma, o item é descartado.</p>
+    </div>
+    <div class="flex flex-col gap-1.5">
+      <span class="font-label-sm font-semibold text-on-surface-variant">Palavras de interesse (positivas)</span>
+      <div id="t-pos"></div>
+      <p class="font-label-sm text-[11px] text-outline">Quanto mais aparecerem no item, maior a nota. Aceita plural e pequenos erros de digitação.</p>
+    </div>
+    <div class="flex flex-col gap-1.5">
+      <span class="font-label-sm font-semibold text-on-surface-variant">Palavras que eliminam o item (negativas)</span>
+      <div id="t-neg"></div>
+      <p class="font-label-sm text-[11px] text-outline">Ex.: locação, reforma. Se aparecer na descrição ou no objeto, o item é descartado.</p>
+    </div>
+    <div class="flex flex-col gap-1.5">
+      <span class="font-label-sm font-semibold text-on-surface-variant">Códigos CATMAT/CATSER</span>
+      <div id="t-cat"></div>
+      <p class="font-label-sm text-[11px] text-outline">Código idêntico ao do item dá a maior pontuação. Só números.</p>
+    </div>
+    <label class="flex flex-col gap-1.5">
+      <span class="font-label-sm font-semibold text-on-surface-variant">Descrição do que você fornece (opcional)</span>
+      <textarea id="f-desc" rows="2" maxlength="500" placeholder="Ex.: Fornecimento de notebooks corporativos, estações de trabalho e monitores" class="rounded bg-surface-container-low px-3 py-2 font-body-sm focus:outline-none focus:ring-2 focus:ring-secondary"></textarea>
+      <span class="font-label-sm text-[11px] text-outline">Ajuda a encontrar itens com outras palavras para a mesma coisa. Sem ela, usamos o nome e as palavras acima.</span>
+    </label>
+
+    <p id="f-erro" class="hidden text-error font-label-sm"></p>
+    <button id="f-salvar" type="submit" class="self-start flex items-center gap-2 px-4 py-2.5 rounded bg-secondary text-on-secondary font-label-md font-semibold hover:opacity-90 transition-opacity">
+      <span class="material-symbols-outlined text-[18px]">save</span>Salvar perfil
+    </button>
+  </form>
+</div>
+</div>
+<datalist id="editais-dl"></datalist>
+<script>
+  const UFS = ["AC","AL","AM","AP","BA","CE","DF","ES","GO","MA","MG","MS","MT","PA","PB","PE","PI","PR","RJ","RN","RO","RR","RS","SC","SE","SP","TO"];
+  const $ = (id) => document.getElementById(id);
+  const brl = (n) => Number(n).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+
+  function el(tag, cls, text) {
+    const e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text !== undefined) e.textContent = text;
+    return e;
+  }
+
+  async function api(url, options) {
+    const res = await fetch(url, options);
+    if (res.status === 204) return null;
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const d = data.detail;
+      const err = new Error(typeof d === "string" ? d : (Array.isArray(d) ? d.map((x) => x.msg).join("; ") : "Erro " + res.status));
+      err.status = res.status;
+      throw err;
+    }
+    return data;
+  }
+
+  // ---- campo de etiquetas (Enter ou vírgula adiciona) ----
+  function tagInput(containerId, chipCls, { numeric = false, placeholder = "", label = "" } = {}) {
+    const box = $(containerId);
+    const values = [];
+    const wrap = el("div", "flex flex-wrap items-center gap-1.5 rounded bg-surface-container-low px-2 py-1.5 focus-within:ring-2 focus-within:ring-secondary");
+    const input = el("input", "flex-1 min-w-[140px] bg-transparent px-1 py-1 font-body-sm focus:outline-none");
+    input.type = "text";
+    input.setAttribute("aria-label", label || placeholder || "Adicionar item");
+    input.autocomplete = "off";
+    input.spellcheck = false;
+    input.placeholder = placeholder || "Digite e pressione Enter";
+    if (numeric) input.inputMode = "numeric";
+    wrap.appendChild(input);
+    box.appendChild(wrap);
+
+    function render() {
+      wrap.querySelectorAll("[data-chip]").forEach((c) => c.remove());
+      values.forEach((v, i) => {
+        const chip = el("span", "inline-flex items-center gap-1 px-2 py-0.5 rounded font-label-md font-semibold " + chipCls);
+        chip.dataset.chip = "1";
+        chip.append(document.createTextNode(v));
+        const x = el("button", "leading-none font-bold hover:opacity-70", "×");
+        x.type = "button";
+        x.setAttribute("aria-label", "Remover " + v);
+        x.addEventListener("click", () => { values.splice(i, 1); render(); });
+        chip.appendChild(x);
+        wrap.insertBefore(chip, input);
+      });
+    }
+    function commit() {
+      input.value.split(",").map((t) => t.trim()).filter(Boolean).forEach((t) => {
+        if (numeric && !/^\d+$/.test(t)) return;
+        if (!values.some((v) => v.toLowerCase() === t.toLowerCase())) values.push(t);
+      });
+      input.value = "";
+      render();
+    }
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === ",") { e.preventDefault(); commit(); }
+      else if (e.key === "Backspace" && !input.value && values.length) { values.pop(); render(); }
+    });
+    input.addEventListener("blur", commit);
+    return { get: () => { commit(); return values.slice(); }, clear: () => { values.length = 0; input.value = ""; render(); } };
+  }
+
+  let tags = {};
+  const ufSel = new Set();
+
+  function renderUfs() {
+    const box = $("ufs");
+    box.innerHTML = "";
+    UFS.forEach((uf) => {
+      const on = ufSel.has(uf);
+      const b = el("button", "py-1.5 rounded font-label-md font-semibold transition-colors " + (on ? "bg-secondary text-on-secondary" : "bg-surface-container-low text-on-surface-variant hover:bg-surface-container"), uf);
+      b.type = "button";
+      b.setAttribute("aria-pressed", String(on));
+      b.addEventListener("click", () => { on ? ufSel.delete(uf) : ufSel.add(uf); renderUfs(); });
+      box.appendChild(b);
+    });
+    $("ufs-dica").textContent = ufSel.size === 0
+      ? "Nenhum estado marcado: o perfil vale para o Brasil inteiro."
+      : ufSel.size + " estado(s) marcado(s): só editais dessas UFs serão avaliados.";
+  }
+
+  // ---- lista de perfis ----
+  function chips(items, cls) {
+    const w = el("div", "flex flex-wrap gap-1");
+    items.forEach((t) => w.appendChild(el("span", "px-2 py-0.5 rounded font-label-md font-semibold " + cls, t)));
+    return w;
+  }
+  function row(label, node) {
+    const r = el("div", "flex flex-wrap items-start gap-2");
+    r.appendChild(el("span", "font-label-sm uppercase tracking-wider text-outline font-bold w-28 shrink-0 pt-0.5", label));
+    r.appendChild(node);
+    return r;
+  }
+
+  function profileCard(p) {
+    const card = el("article", "bg-surface-container-lowest rounded shadow-sm overflow-hidden");
+    const head = el("div", "p-space-md bg-surface-container-low flex flex-wrap items-center justify-between gap-space-sm");
+    head.appendChild(el("h3", "font-headline-sm text-headline-sm font-bold", p.nome_perfil));
+    const actions = el("div", "flex flex-wrap gap-2");
+    const mk = (txt, icon, cls, fn) => {
+      const b = el("button", "flex items-center gap-1.5 px-3 py-1.5 rounded font-label-md font-semibold transition-colors " + cls);
+      b.type = "button";
+      const i = el("span", "material-symbols-outlined text-[16px]", icon);
+      b.append(i, document.createTextNode(txt));
+      b.addEventListener("click", fn);
+      actions.appendChild(b);
+    };
+    const panel = el("div", "hidden border-t border-surface-container p-space-md bg-surface-container-lowest flex flex-col gap-space-sm");
+    mk("Testar com um edital", "science", "bg-secondary-container text-on-secondary-container hover:opacity-90", () => openTest(panel, p));
+    mk("Ver oportunidades", "list_alt", "bg-surface-container text-on-surface hover:bg-surface-container-high", () => openOpps(panel, p));
+    mk("Agendar envio", "schedule_send", "bg-surface-container text-on-surface hover:bg-surface-container-high", () => openSchedule(panel, p));
+    mk("Ver digest", "mail", "bg-surface-container text-on-surface hover:bg-surface-container-high", () => openDigest(panel, p));
+    mk("Excluir", "delete", "bg-surface-container text-on-surface-variant hover:bg-error-container hover:text-on-error-container", async () => {
+      if (!confirm("Excluir o perfil “" + p.nome_perfil + "”? Os resultados já gravados dele também serão removidos.")) return;
+      try { await api("/matching/profiles/" + p.id, { method: "DELETE" }); loadProfiles(); }
+      catch (e) { alert("Não foi possível excluir: " + e.message); }
+    });
+    head.appendChild(actions);
+    card.appendChild(head);
+
+    const body = el("div", "p-space-md flex flex-col gap-space-sm");
+    body.appendChild(row("Estados", p.ufs_permitidas.length ? chips(p.ufs_permitidas, "bg-surface-container text-on-surface") : el("span", "font-body-sm text-on-surface-variant", "Brasil inteiro")));
+    const faixa = (p.valor_minimo_item ? "de " + brl(p.valor_minimo_item) : "sem mínimo") + (p.valor_maximo_item != null ? " até " + brl(p.valor_maximo_item) : ", sem máximo");
+    body.appendChild(row("Valor do item", el("span", "font-body-sm", faixa + (p.apenas_me_epp ? " · só exclusivos ME/EPP" : ""))));
+    if (p.palavras.OBRIGATORIA.length) body.appendChild(row("Obrigatórias", chips(p.palavras.OBRIGATORIA, "bg-secondary-fixed text-on-secondary-fixed")));
+    if (p.palavras.POSITIVA.length) body.appendChild(row("Interesse", chips(p.palavras.POSITIVA, "bg-tertiary-fixed text-on-tertiary-fixed")));
+    if (p.palavras.NEGATIVA.length) body.appendChild(row("Eliminam", chips(p.palavras.NEGATIVA, "bg-error-container text-on-error-container")));
+    if (p.codigos_catalogo.length) body.appendChild(row("CATMAT/CATSER", chips(p.codigos_catalogo.map(String), "bg-surface-container text-on-surface font-data-mono")));
+    card.appendChild(body);
+    card.appendChild(panel);
+    return card;
+  }
+
+  async function loadProfiles() {
+    const lista = $("lista");
+    try {
+      const data = await api("/matching/profiles");
+      lista.innerHTML = "";
+      data.perfis.forEach((p) => lista.appendChild(profileCard(p)));
+      $("lista-vazia").classList.toggle("hidden", data.perfis.length > 0);
+    } catch (e) {
+      lista.innerHTML = "";
+      lista.appendChild(el("div", "bg-error-container text-on-error-container rounded p-space-md font-body-sm", "Não foi possível carregar os perfis (" + e.message + "). Verifique se a API e o banco de dados estão no ar."));
+    }
+  }
+
+  // ---- teste com um edital ----
+  function openTest(panel, p) {
+    panel.classList.remove("hidden");
+    panel.innerHTML = "";
+    panel.appendChild(el("p", "font-body-sm text-on-surface-variant", "Escolha um edital já capturado para ver quais itens dele combinam com este perfil."));
+    const line = el("div", "flex flex-wrap gap-2");
+    const inp = el("input", "flex-1 min-w-[260px] rounded bg-surface-container-low px-3 py-2 font-data-mono text-[12px] focus:outline-none focus:ring-2 focus:ring-secondary");
+    inp.setAttribute("list", "editais-dl");
+    inp.placeholder = "ID PNCP (ex.: 00394452000103-1-000033/2024)";
+    const run = el("button", "px-4 py-2 rounded bg-secondary text-on-secondary font-label-md font-semibold hover:opacity-90", "Avaliar");
+    run.type = "button";
+    line.append(inp, run);
+    const out = el("div", "flex flex-col gap-space-sm");
+    panel.append(line, out);
+
+    async function go(hydrateFirst) {
+      const id = inp.value.trim();
+      if (!id) return;
+      out.innerHTML = "";
+      out.appendChild(el("p", "font-body-sm text-on-surface-variant", hydrateFirst ? "Buscando itens no PNCP…" : "Avaliando…"));
+      try {
+        if (hydrateFirst) await api("/ingestion/pncp/" + id + "/itens/hydrate", { method: "POST" });
+        const r = await api("/matching/profiles/" + p.id + "/match", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id_pncp: id }) });
+        showResult(out, r);
+      } catch (e) {
+        out.innerHTML = "";
+        const msg = e.status === 404 ? "Edital não encontrado. Confira o ID PNCP ou capture o edital em Captação PNCP." : (e.status === 409 ? "Este edital ainda não tem itens carregados." : e.message);
+        out.appendChild(el("p", "font-body-sm text-error", msg));
+        if (e.status === 409) {
+          const b = el("button", "self-start px-3 py-1.5 rounded bg-surface-container text-on-surface font-label-md font-semibold hover:bg-surface-container-high", "Buscar itens deste edital no PNCP");
+          b.type = "button";
+          b.addEventListener("click", () => go(true));
+          out.appendChild(b);
+        }
+      }
+    }
+    run.addEventListener("click", () => go(false));
+    fillEditais();
+  }
+
+  function showResult(out, r) {
+    out.innerHTML = "";
+    out.appendChild(el("p", "font-body-sm text-on-surface-variant",
+      r.itens_total + " item(ns) no edital · " + r.descartados_camada1 + " descartado(s) pelos filtros · " +
+      r.excluidos_obrigatoria_ausente + " sem palavra obrigatória · " + r.candidatos.length + " com aderência"));
+    if (String(r.embedding.backend).startsWith("hash")) {
+      out.appendChild(el("p", "font-label-sm text-[11px] text-outline", "A nota por significado está aproximada (sem chave de IA configurada): conta palavras em comum."));
+    }
+    if (!r.candidatos.length) return;
+    const wrap = el("div", "overflow-x-auto");
+    const t = el("table", "w-full text-left min-w-[560px]");
+    const thead = el("thead");
+    const hr = el("tr", "bg-surface-container text-on-surface-variant font-label-md uppercase tracking-wider");
+    ["Item", "Descrição", "Código", "Palavras", "Significado", "Nota"].forEach((h) => hr.appendChild(el("th", "px-3 py-2 font-semibold", h)));
+    thead.appendChild(hr);
+    const tb = el("tbody", "divide-y divide-surface-container");
+    r.candidatos.forEach((c) => {
+      const tr = el("tr");
+      tr.append(
+        el("td", "px-3 py-2 font-data-mono", String(c.numero_item)),
+        el("td", "px-3 py-2", c.descricao),
+        el("td", "px-3 py-2 font-data-mono", String(c.score_catmat)),
+        el("td", "px-3 py-2 font-data-mono", String(c.score_lexico)),
+        el("td", "px-3 py-2 font-data-mono", String(c.score_semantico)),
+      );
+      const td = el("td", "px-3 py-2");
+      td.appendChild(el("span", "px-2 py-0.5 rounded font-label-md font-bold " + (c.alerta ? "bg-tertiary-fixed text-on-tertiary-fixed" : "bg-surface-container text-on-surface-variant"), c.score_total + (c.alerta ? " · alerta" : "")));
+      tr.appendChild(td);
+      tb.appendChild(tr);
+    });
+    t.append(thead, tb);
+    wrap.appendChild(t);
+    out.appendChild(wrap);
+    out.appendChild(el("p", "font-label-sm text-[11px] text-outline", "Nota de 0 a 100: código (até 40) + palavras (até 35) + significado (até 25). Alerta a partir de 65."));
+  }
+
+  // ---- envio agendado do digest ----
+  function brtText(iso) {
+    return iso ? iso.slice(8, 10) + "/" + iso.slice(5, 7) + " às " + iso.slice(11, 16) : "—";
+  }
+
+  async function openSchedule(panel, p) {
+    panel.classList.remove("hidden");
+    panel.innerHTML = "";
+    panel.appendChild(el("p", "font-body-sm text-on-surface-variant", "Carregando…"));
+    let cur;
+    try { cur = await api("/matching/profiles/" + p.id + "/agendamento"); }
+    catch (e) { panel.innerHTML = ""; panel.appendChild(el("p", "font-body-sm text-error", e.message)); return; }
+    panel.innerHTML = "";
+    panel.appendChild(el("p", "font-body-sm text-on-surface-variant", "Receba por WhatsApp, todo dia no horário escolhido (horário de Brasília), um resumo dos editais novos com aderência a este perfil. Se não houver novidades, nada é enviado."));
+
+    const grid = el("div", "grid grid-cols-1 sm:grid-cols-3 gap-space-sm");
+    const field = (label, input) => { const l = el("label", "flex flex-col gap-1"); l.append(el("span", "font-label-sm font-semibold text-on-surface-variant", label), input); return l; };
+    const cls = "rounded bg-surface-container-low px-3 py-2 font-body-sm focus:outline-none focus:ring-2 focus:ring-secondary";
+    const tel = el("input", cls); tel.type = "tel"; tel.placeholder = "5571999999999"; tel.value = cur.telefone || "";
+    const hor = el("input", cls); hor.type = "time"; hor.value = cur.horario || "08:00";
+    const top = el("select", cls);
+    [3, 5, 10, 15].forEach((n) => { const o = el("option", "", n + " editais"); o.value = n; if ((cur.top_n || 5) === n) o.selected = true; top.appendChild(o); });
+    grid.append(field("WhatsApp com DDI *", tel), field("Horário", hor), field("Máx. de editais por envio", top));
+    panel.appendChild(grid);
+
+    const ativoL = el("label", "flex items-center gap-2 font-label-md");
+    const ativo = el("input"); ativo.type = "checkbox"; ativo.className = "accent-secondary w-4 h-4"; ativo.checked = cur.configurado ? cur.ativo : true;
+    ativoL.append(ativo, document.createTextNode("Envio ativo"));
+    panel.appendChild(ativoL);
+
+    const info = el("div", "font-label-md text-on-surface-variant");
+    if (cur.configurado) {
+      info.appendChild(el("div", "", cur.ativo ? "Próximo envio: " + brtText(cur.proxima_execucao) : "Envio desativado."));
+      if (cur.ultimo_status) info.appendChild(el("div", "", "Último resultado: " + cur.ultimo_status + (cur.ultimo_envio_dia ? " (" + cur.ultimo_envio_dia.split("-").reverse().join("/") + ")" : "")));
+    }
+    panel.appendChild(info);
+
+    const err = el("p", "hidden text-error font-label-sm");
+    const bar = el("div", "flex flex-wrap gap-2");
+    const save = el("button", "px-4 py-2 rounded bg-secondary text-on-secondary font-label-md font-semibold hover:opacity-90", "Salvar agendamento");
+    save.type = "button";
+    save.addEventListener("click", async () => {
+      err.classList.add("hidden");
+      try {
+        await api("/matching/profiles/" + p.id + "/agendamento", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ telefone: tel.value, horario: hor.value, top_n: Number(top.value), ativo: ativo.checked }) });
+        openSchedule(panel, p);
+      } catch (e) { err.textContent = e.message; err.classList.remove("hidden"); }
+    });
+    bar.appendChild(save);
+    if (cur.configurado) {
+      const del = el("button", "px-4 py-2 rounded bg-surface-container text-on-surface-variant font-label-md font-semibold hover:bg-error-container hover:text-on-error-container", "Remover agendamento");
+      del.type = "button";
+      del.addEventListener("click", async () => {
+        if (!confirm("Remover o envio agendado deste perfil?")) return;
+        await api("/matching/profiles/" + p.id + "/agendamento", { method: "DELETE" });
+        openSchedule(panel, p);
+      });
+      bar.appendChild(del);
+    }
+    panel.append(bar, err);
+  }
+
+  // ---- feedback: relevante / irrelevante ----
+  function feedbackButtons(cell, tr, o, p) {
+    const wrap = el("div", "flex gap-1");
+    const mk = (icon, label, relevante) => {
+      const b = el("button", "flex items-center gap-1 px-2 py-1 rounded font-label-sm font-semibold transition-colors " + (relevante ? "bg-tertiary-fixed text-on-tertiary-fixed hover:opacity-80" : "bg-surface-container text-on-surface-variant hover:bg-error-container hover:text-on-error-container"));
+      b.type = "button";
+      b.append(el("span", "material-symbols-outlined text-[14px]", icon), document.createTextNode(label));
+      b.addEventListener("click", async () => {
+        wrap.querySelectorAll("button").forEach((x) => (x.disabled = true));
+        try {
+          const r = await api("/matching/matches/" + o.match_id + "/feedback", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ relevante }) });
+          wrap.replaceChildren(el("span", "font-label-md font-semibold " + (relevante ? "text-on-tertiary-container" : "text-on-surface-variant"), relevante ? "Marcada como relevante" : "Descartada"));
+          tr.children[4].textContent = relevante ? "Favorito" : "Descartado";
+          if (!relevante && r.sugestoes_negativas.length) showSuggestions(tr, r.sugestoes_negativas, p);
+        } catch (e) {
+          wrap.querySelectorAll("button").forEach((x) => (x.disabled = false));
+          alert("Não foi possível registrar: " + e.message);
+        }
+      });
+      return b;
+    };
+    wrap.append(mk("thumb_up", "Relevante", true), mk("thumb_down", "Irrelevante", false));
+    cell.appendChild(wrap);
+  }
+
+  function showSuggestions(tr, termos, p) {
+    const row = el("tr");
+    const td = el("td", "px-3 pb-3 bg-surface-container-low");
+    td.colSpan = 6;
+    td.appendChild(el("p", "font-label-md text-on-surface-variant pt-2", "Quer deixar de receber itens com estas palavras? Clique para bloquear no perfil:"));
+    const box = el("div", "flex flex-wrap gap-1.5 mt-1");
+    termos.forEach((t) => {
+      const c = el("button", "px-2 py-0.5 rounded font-label-md font-semibold bg-error-container text-on-error-container hover:opacity-80", "+ " + t);
+      c.type = "button";
+      c.addEventListener("click", async () => {
+        c.disabled = true;
+        try {
+          await api("/matching/profiles/" + p.id + "/palavras", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tipo: "NEGATIVA", termo: t }) });
+          c.textContent = "✓ " + t + " bloqueada";
+          c.className = "px-2 py-0.5 rounded font-label-md font-semibold bg-surface-container text-on-surface-variant";
+        } catch (e) { c.disabled = false; alert("Não foi possível adicionar: " + e.message); }
+      });
+      box.appendChild(c);
+    });
+    td.appendChild(box);
+    td.appendChild(el("p", "font-label-sm text-[11px] text-outline mt-1", "Vale para as próximas buscas; oportunidades já listadas não somem."));
+    row.appendChild(td);
+    tr.after(row);
+  }
+
+  // ---- oportunidades gravadas (paginadas) ----
+  async function openOpps(panel, p, pagina = 1, apenasAlerta = true) {
+    panel.classList.remove("hidden");
+    panel.innerHTML = "";
+    panel.appendChild(el("p", "font-body-sm text-on-surface-variant", "Carregando…"));
+    try {
+      const d = await api("/matching/profiles/" + p.id + "/oportunidades?pagina=" + pagina + "&tamanho=10&apenas_alerta=" + apenasAlerta);
+      panel.innerHTML = "";
+      const top = el("div", "flex flex-wrap items-center justify-between gap-2");
+      top.appendChild(el("p", "font-body-sm text-on-surface-variant", d.total + " oportunidade(s)" + (apenasAlerta ? " com alerta (nota 65 ou mais)" : " (nota 40 ou mais)") + ", da maior para a menor nota."));
+      const lbl = el("label", "flex items-center gap-2 font-label-md");
+      const chk = el("input"); chk.type = "checkbox"; chk.checked = apenasAlerta; chk.className = "accent-secondary w-4 h-4";
+      chk.addEventListener("change", () => openOpps(panel, p, 1, chk.checked));
+      lbl.append(chk, document.createTextNode("Só com alerta"));
+      top.appendChild(lbl);
+      panel.appendChild(top);
+      if (!d.itens.length) {
+        panel.appendChild(el("p", "font-body-sm text-on-surface-variant", "Nenhuma oportunidade ainda. Elas aparecem depois que a captação do PNCP roda com este perfil ativo."));
+        return;
+      }
+      const wrap = el("div", "overflow-x-auto");
+      const t = el("table", "w-full text-left min-w-[640px]");
+      const hr = el("tr", "bg-surface-container text-on-surface-variant font-label-md uppercase tracking-wider");
+      ["Nota", "Item", "Órgão", "Valor unit.", "Situação", "Esta oportunidade é…"].forEach((h) => hr.appendChild(el("th", "px-3 py-2 font-semibold", h)));
+      const thead = el("thead"); thead.appendChild(hr);
+      const tb = el("tbody", "divide-y divide-surface-container");
+      d.itens.forEach((o) => {
+        const tr = el("tr");
+        const tdN = el("td", "px-3 py-2");
+        tdN.appendChild(el("span", "px-2 py-0.5 rounded font-label-md font-bold " + (o.alerta ? "bg-tertiary-fixed text-on-tertiary-fixed" : "bg-surface-container text-on-surface-variant"), String(o.score_total)));
+        const tdI = el("td", "px-3 py-2");
+        tdI.appendChild(el("div", "font-label-lg", o.item.descricao));
+        tdI.appendChild(el("div", "font-data-mono text-[11px] text-outline", "item " + o.item.numero_item + " · " + o.edital.id_pncp));
+        const docs = (o.edital.anexos || []).filter((a) => /^https:\/\//i.test(a.url));
+        if (docs.length) {
+          const dv = el("div", "flex flex-wrap gap-x-3 gap-y-0.5 mt-1");
+          docs.forEach((a) => {
+            const l = el("a", "inline-flex items-center gap-1 font-label-md text-secondary font-semibold hover:underline");
+            l.href = a.url; l.target = "_blank"; l.rel = "noopener noreferrer";
+            l.append(el("span", "material-symbols-outlined text-[14px]", "description"), document.createTextNode(a.tipo || a.titulo || "Documento"));
+            dv.appendChild(l);
+          });
+          tdI.appendChild(dv);
+        }
+        const tdO = el("td", "px-3 py-2");
+        tdO.appendChild(el("div", "", o.edital.orgao || "—"));
+        tdO.appendChild(el("div", "font-label-sm text-on-surface-variant", o.edital.uf || ""));
+        tr.append(tdN, tdI, tdO,
+          el("td", "px-3 py-2 font-data-mono", o.item.valor_unitario_estimado != null ? brl(o.item.valor_unitario_estimado) : "—"),
+          el("td", "px-3 py-2 font-label-md", { NOVO: "Novo", ENVIADO: "Enviado", DESCARTADO: "Descartado", FAVORITO: "Favorito" }[o.status] || o.status));
+        const tdA = el("td", "px-3 py-2");
+        tr.appendChild(tdA);
+        feedbackButtons(tdA, tr, o, p, tb);
+        tb.appendChild(tr);
+      });
+      t.append(thead, tb); wrap.appendChild(t); panel.appendChild(wrap);
+      const nav = el("div", "flex items-center justify-between");
+      nav.appendChild(el("span", "font-label-md text-on-surface-variant", "Página " + d.pagina + " de " + d.paginas));
+      const btns = el("div", "flex gap-2");
+      const mkb = (txt, dis, pg) => {
+        const b = el("button", "px-3 py-1.5 rounded bg-surface-container text-on-surface font-label-md font-semibold hover:bg-surface-container-high disabled:opacity-40", txt);
+        b.type = "button"; b.disabled = dis;
+        b.addEventListener("click", () => openOpps(panel, p, pg, apenasAlerta));
+        return b;
+      };
+      btns.append(mkb("Anterior", d.pagina <= 1, d.pagina - 1), mkb("Próxima", d.pagina >= d.paginas, d.pagina + 1));
+      nav.appendChild(btns); panel.appendChild(nav);
+    } catch (e) {
+      panel.innerHTML = "";
+      panel.appendChild(el("p", "font-body-sm text-error", e.message));
+    }
+  }
+
+  async function openDigest(panel, p) {
+    panel.classList.remove("hidden");
+    panel.innerHTML = "";
+    panel.appendChild(el("p", "font-body-sm text-on-surface-variant", "Carregando…"));
+    try {
+      const d = await api("/matching/profiles/" + p.id + "/digest");
+      panel.innerHTML = "";
+      panel.appendChild(el("p", "font-body-sm text-on-surface-variant", d.editais + " edital(is) novo(s) com aderência. Esta é a mensagem que seria enviada por WhatsApp:"));
+      panel.appendChild(el("pre", "font-data-mono text-[12px] bg-surface-container-low rounded p-space-sm whitespace-pre-wrap", d.mensagem));
+    } catch (e) {
+      panel.innerHTML = "";
+      panel.appendChild(el("p", "font-body-sm text-error", e.message));
+    }
+  }
+
+  async function fillEditais() {
+    const dl = $("editais-dl");
+    if (dl.childElementCount) return;
+    try {
+      const d = await api("/tenders?limit=30");
+      (d.items || []).forEach((t) => {
+        if (!t.id_pncp) return;
+        const o = document.createElement("option");
+        o.value = t.id_pncp;
+        o.label = [t.orgao_comprador || t.orgao, t.uf].filter(Boolean).join(" · ");
+        dl.appendChild(o);
+      });
+    } catch { /* sem sugestões: o campo aceita digitação livre */ }
+  }
+
+  // ---- salvar ----
+  function showErr(msg) {
+    const e = $("f-erro");
+    e.textContent = msg;
+    e.classList.remove("hidden");
+  }
+
+  async function save(ev) {
+    ev.preventDefault();
+    $("f-erro").classList.add("hidden");
+    const nome = $("f-nome").value.trim();
+    const min = $("f-min").value === "" ? 0 : parseFloat($("f-min").value);
+    const max = $("f-max").value === "" ? null : parseFloat($("f-max").value);
+    if (!nome) return showErr("Informe o nome do perfil.");
+    if (max !== null && max < min) return showErr("O valor máximo não pode ser menor que o mínimo.");
+    const body = {
+      nome_perfil: nome,
+      ufs_permitidas: [...ufSel],
+      valor_minimo_item: min,
+      valor_maximo_item: max,
+      apenas_me_epp: $("f-me").checked,
+      palavras_obrigatorias: tags.obrig.get(),
+      palavras_positivas: tags.pos.get(),
+      palavras_negativas: tags.neg.get(),
+      codigos_catalogo: tags.cat.get().map(Number),
+      descricao_sintetica: $("f-desc").value.trim() || null,
+    };
+    if (!body.palavras_obrigatorias.length && !body.palavras_positivas.length && !body.codigos_catalogo.length && !body.descricao_sintetica) {
+      return showErr("Informe ao menos palavras de interesse, um código CATMAT ou uma descrição, senão nenhum item terá aderência.");
+    }
+    const btn = $("f-salvar");
+    btn.disabled = true;
+    try {
+      await api("/matching/profiles", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      $("form").reset();
+      Object.values(tags).forEach((t) => t.clear());
+      ufSel.clear();
+      renderUfs();
+      await loadProfiles();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch (e) {
+      showErr("Não foi possível salvar: " + e.message);
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  LicitAllShell.mount({
+    active: "perfis",
+    onReady() {
+      tags = {
+        obrig: tagInput("t-obrig", "bg-secondary-fixed text-on-secondary-fixed", { placeholder: "Ex.: giratória…", label: "Palavras obrigatórias" }),
+        pos: tagInput("t-pos", "bg-tertiary-fixed text-on-tertiary-fixed", { placeholder: "Ex.: cadeira, mesa, armário…", label: "Palavras de interesse" }),
+        neg: tagInput("t-neg", "bg-error-container text-on-error-container", { placeholder: "Ex.: locação, reforma…", label: "Palavras que eliminam o item" }),
+        cat: tagInput("t-cat", "bg-surface-container text-on-surface", { numeric: true, placeholder: "Ex.: 123456…", label: "Códigos CATMAT ou CATSER" }),
+      };
+      renderUfs();
+      $("ufs-todas").addEventListener("click", () => { UFS.forEach((u) => ufSel.add(u)); renderUfs(); });
+      $("ufs-limpar").addEventListener("click", () => { ufSel.clear(); renderUfs(); });
+      $("form").addEventListener("submit", save);
+      loadProfiles();
+    },
+  });
+</script>
+</body>
+</html>

@@ -29,7 +29,8 @@ python scripts/smoke_compose.py --api http://127.0.0.1:8000
 ```
 
 - API: http://localhost:8000/health  
-- **UI:** http://localhost:8000/ui/login.html (demo `admin@licitall.local` / `licitall`)
+- **Produção (HTTPS, migrações, backup):** `docs/usuario/OPERACAO_DOCKER.md` seção 9 · `docker compose --profile app up -d --build`
+- **UI:** http://localhost:8000/ui/login.html — crie a conta da empresa em `/ui/cadastro.html` (ou `python -m scripts.criar_usuario`); operadores via `ADMIN_EMAILS`
 - **Guia PDF:** `docs/usuario/LicitAll_Guia_Usuario.pdf` (como usar + funcionalidades)
 - **Editais reais:** `GET /tenders` · stats `GET /tenders/stats`  
 - Docs OpenAPI: http://localhost:8000/docs  

@@ -1,0 +1,17 @@
+# Proxy reverso com HTTPS automático (Let's Encrypt) quando DOMAIN é um domínio público com DNS apontado para este
+# servidor e as portas 80/443 abertas. Com DOMAIN=localhost, o Caddy usa um certificado local próprio (só para testes).
+{$DOMAIN:localhost} {
+	encode zstd gzip
+
+	request_body {
+		max_size 10MB
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		-Server
+	}
+
+	reverse_proxy api:8000
+}
