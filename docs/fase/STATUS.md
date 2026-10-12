@@ -158,6 +158,9 @@ Preparação para testar `POST /matching/company` com uma empresa real. **Corrig
 
 **Migração `0003`:** `perfis_interesse.empresa_id` virou UUID com chave estrangeira para `empresas.id` e `ON DELETE CASCADE` (excluir a empresa exclui perfis, regras, oportunidades e agendamentos, como já acontecia com certidões e atestados). Perfis **órfãos** (empresa_id que não é UUID de empresa existente, ex.: e-mail de antes da autenticação real) **não são apagados em silêncio**: a migração para, mostra quantos são e exemplos, e só os remove com `LICITALL_REMOVER_PERFIS_ORFAOS=1`. Tolerante a banco que já tenha o tipo novo; downgrade volta para texto. Testes: 3 novos em `test_migrations.py` (para sem apagar, remove quando pedido + cascata, downgrade); `schema_diff` vazio após a 0003. **Ação no seu banco local:** rodar `python -m src.db.migrate` (o `create_all` não altera a coluna existente; sem migrar, as telas de perfis dão erro de tipo). Se aparecer o aviso de órfãos, confira e rode de novo com a variável.
 
+
+**Primeiro teste real (2026-10-12):** escritório de advocacia de Salvador (CNAE 6911701, porte Demais), UF BA: nenhum edital aberto no banco local (os da BA eram do teste de setembro, já vencidos) e o script terminava sem explicar. Agora diz quantos editais há e quantos estão abertos, e `--sincronizar DIAS` busca os abertos no PNCP. Mapa de CNAE ganhou serviços jurídicos (6911701) e contábeis (6920601/6920602); antes, "assessoria jurídica" só casava com consultoria em gestão (7020400). Também corrigido: a adoção de banco legado conferia o esquema **antes** de migrar e acusava como divergência o que a `0003` muda (em produção a API recusaria subir); agora confere depois.
+
 ---
 
 ## Próxima ação recomendada

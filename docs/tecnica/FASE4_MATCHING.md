@@ -79,7 +79,7 @@ python -m scripts.match_empresa_real 12345678000199 --uf BA --json resultado.jso
 python -m scripts.match_empresa_real 12345678000199 --uf BA --minha-receita https://minhareceita.org
 ```
 
-Mostra a empresa, quantos editais tinham itens e CNAE inferido, a contagem BID/REVIEW/SKIP e o top N com os 5 fatores. Não grava nada.
+Com `--sincronizar 7` (exige `--uf`) busca antes no PNCP os editais abertos publicados nos últimos 7 dias. Sem edital aberto no banco, diz quantos editais da UF existem e quantos estão abertos. Mostra a empresa, quantos editais tinham itens e CNAE inferido, a contagem BID/REVIEW/SKIP e o top N com os 5 fatores. Só grava com `--sincronizar`.
 
 ## Pré-requisito operacional
 

@@ -270,3 +270,12 @@ def test_generos_alimenticios_e_comercio_de_alimentos_nao_restaurante():
     for objeto in ("Aquisição de gêneros alimentícios", "AQUISICAO DE GENEROS ALIMENTICIOS PARA A MERENDA"):
         assert "4639701" in infer_cnaes_from_text(objeto)
     assert "4639701" not in infer_cnaes_from_text("Fornecimento de refeições")
+
+
+def test_servicos_juridicos_e_contabeis_tem_ramo_proprio():
+    from src.matching.cnae_map import infer_cnaes_from_text
+
+    assert "6911701" in infer_cnaes_from_text("Contratação de serviços de assessoria jurídica")
+    assert "6911701" in infer_cnaes_from_text("Contratação de escritório de advocacia")
+    assert "6920601" in infer_cnaes_from_text("Prestação de serviços de assessoria contábil")
+    assert "6911701" not in infer_cnaes_from_text("Serviços de consultoria em gestão")

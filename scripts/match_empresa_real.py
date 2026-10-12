@@ -2,10 +2,11 @@
 
     python -m scripts.match_empresa_real 12345678000199 [--uf BA] [--top 15] [--json saida.json]
     python -m scripts.match_empresa_real 12345678000199 --minha-receita https://minhareceita.org
+    python -m scripts.match_empresa_real 12345678000199 --uf BA --sincronizar 7   # busca antes os abertos dos últimos 7 dias
 
 Lê `tender_ingest` (rode o sync antes) e consulta o CNPJ na Minha Receita. Sem a base local
 (ETL), `--minha-receita https://minhareceita.org` usa a API pública, que tem o mesmo formato.
-Não grava nada no banco.
+Só grava no banco com --sincronizar (editais abertos do PNCP, o mesmo que o sync da API faz).
 """
 
 from __future__ import annotations
@@ -28,14 +29,27 @@ async def main(args: argparse.Namespace) -> None:
     if args.minha_receita:
         os.environ["MINHA_RECEITA_BASE_URL"] = args.minha_receita
 
+    from sqlalchemy import func
+    from sqlmodel import select
+
     from src.db import get_session_factory, init_db
+    from src.ingestion.service import open_tenders_clause
     from src.matching.service import MatchmakingService
+    from src.models.tables import TenderIngest
 
     await init_db()
+    if args.sincronizar:
+        await sincronizar(args.uf, args.sincronizar)
+
     service = MatchmakingService()
     try:
         async with get_session_factory()() as session:
             editais = await service.list_open_tenders(session, uf=args.uf)
+            if not editais:
+                filtro = [TenderIngest.uf == args.uf.upper()] if args.uf else []
+                total = (await session.exec(select(func.count()).select_from(TenderIngest).where(*filtro))).one()
+                abertos = (await session.exec(
+                    select(func.count()).select_from(TenderIngest).where(open_tenders_clause(), *filtro))).one()
             result = await service.match_company(
                 args.cnpj,
                 tenders=editais,
@@ -51,7 +65,12 @@ async def main(args: argparse.Namespace) -> None:
     print(f"CNAEs: {', '.join(result.cnaes_empresa) or '—'}")
     for aviso in result.avisos:
         print(f"AVISO: {aviso}")
-    if not editais or not result.razao_social:
+    if not editais:
+        onde = f"da UF {args.uf.upper()}" if args.uf else "de nenhuma UF"
+        print(f"\nNenhum edital aberto {onde} no banco ({total} editais gravados, {abertos} abertos).")
+        print("Busque os abertos no PNCP rodando de novo com --sincronizar 7 (últimos 7 dias; exige --uf).")
+        return
+    if not result.razao_social:
         return
 
     com_itens = sum(1 for t in editais if t.get("itens"))
@@ -80,11 +99,28 @@ async def main(args: argparse.Namespace) -> None:
         print(f"\nResultado completo em {args.json}")
 
 
+async def sincronizar(uf: str | None, dias: int) -> None:
+    from datetime import date, timedelta
+
+    from src.db import get_session_factory
+    from src.ingestion.client import PncpClient
+    from src.ingestion.service import ingest_publicacoes
+
+    if not uf:
+        raise SystemExit("--sincronizar exige --uf (para o Brasil inteiro use o sync da API, que vai UF a UF).")
+    final = date.today()
+    print(f"Sincronizando editais abertos de {uf.upper()} publicados de {final - timedelta(days=dias)} a {final}...")
+    async with get_session_factory()() as session, PncpClient() as client:
+        n = await ingest_publicacoes(session, client, data_inicial=final - timedelta(days=dias), data_final=final, uf=uf.upper())
+    print(f"{n} editais abertos gravados ou atualizados.")
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("cnpj")
     parser.add_argument("--uf", help="Só editais desta UF (padrão: todas)")
     parser.add_argument("--top", type=int, default=15)
     parser.add_argument("--json", help="Grava o resultado completo neste arquivo")
+    parser.add_argument("--sincronizar", type=int, metavar="DIAS", help="Antes, busca no PNCP os editais abertos publicados nos últimos DIAS")
     parser.add_argument("--minha-receita", help="URL da Minha Receita (ex.: https://minhareceita.org)")
     asyncio.run(main(parser.parse_args()))

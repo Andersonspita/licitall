@@ -25,6 +25,8 @@ _CNAE_RULES: tuple[tuple[tuple[str, ...], tuple[str, ...]], ...] = (
     (("manutenção predial", "elétrica", "hidráulica", "ar-condicionado"), ("4321500", "4322300", "4329100")),
     (("transporte", "frete", "logística", "mudança"), ("4930201", "4930202", "5212500")),
     (("consultoria", "assessoria", "treinamento", "capacitação"), ("7020400", "8599604")),
+    (("assessoria jurídica", "consultoria jurídica", "serviços jurídicos", "serviços advocatícios", "advocacia", "advogado"), ("6911701",)),
+    (("contábil", "contabil", "contabilidade", "auditoria independente"), ("6920601", "6920602")),
     (("uniforme", "vestuário", "confecção"), ("1412601", "4781400")),
     (("mobiliário", "móveis", "cadeira", "mesa"), ("3101200", "4754701")),
     (("equipamento de informática", "notebook", "computador", "servidor", "impressora"), ("4751201", "2621300")),
