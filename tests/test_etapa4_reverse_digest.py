@@ -58,9 +58,6 @@ def test_paginacao_limites():
 
 
 def test_rota_oportunidades_antes_da_generica():
-    from src.main import app
+    from _rotas import rota
 
-    paths = [r.path for r in app.routes]
-    assert paths.index("/matching/profiles/{profile_id}/oportunidades") < paths.index(
-        "/matching/{id_pncp:path}"
-    )
+    assert rota("GET", "/matching/profiles/abc/oportunidades") == "/matching/profiles/{profile_id}/oportunidades"

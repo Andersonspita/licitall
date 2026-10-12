@@ -44,9 +44,7 @@ def test_descricao_vazia():
 
 
 def test_rotas_de_feedback_antes_da_generica():
-    from src.main import app
+    from _rotas import rota
 
-    paths = [r.path for r in app.routes]
-    generic = paths.index("/matching/{id_pncp:path}")
-    assert paths.index("/matching/matches/{match_id}/feedback") < generic
-    assert paths.index("/matching/profiles/{profile_id}/palavras") < generic
+    assert rota("POST", "/matching/matches/abc/feedback") == "/matching/matches/{match_id}/feedback"
+    assert rota("POST", "/matching/profiles/abc/palavras") == "/matching/profiles/{profile_id}/palavras"

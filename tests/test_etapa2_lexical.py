@@ -70,9 +70,6 @@ def test_texto_do_objeto_tambem_conta():
 
 
 def test_rota_candidates_antes_da_rota_generica():
-    from src.main import app
+    from _rotas import rota
 
-    paths = [r.path for r in app.routes]
-    assert paths.index("/matching/profiles/{profile_id}/candidates") < paths.index(
-        "/matching/{id_pncp:path}"
-    )
+    assert rota("POST", "/matching/profiles/abc/candidates") == "/matching/profiles/{profile_id}/candidates"

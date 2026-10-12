@@ -16,6 +16,7 @@ from alembic.autogenerate import compare_metadata
 from alembic.config import Config
 from alembic.migration import MigrationContext
 from sqlalchemy import inspect
+from sqlalchemy.types import TypeDecorator
 from sqlalchemy.ext.asyncio import create_async_engine
 from sqlmodel import SQLModel
 
@@ -50,10 +51,17 @@ async def _diff(url: str) -> list:
     try:
         async with engine.connect() as conn:
             return await conn.run_sync(
-                lambda c: compare_metadata(MigrationContext.configure(c, opts={"compare_type": True}), SQLModel.metadata)
+                lambda c: compare_metadata(MigrationContext.configure(c, opts={"compare_type": tipo_mudou}), SQLModel.metadata)
             )
     finally:
         await engine.dispose()
+
+
+def tipo_mudou(_ctx, _insp_col, _meta_col, insp_type, meta_type):
+    """SQLModel recente mapeia datetime para um TypeDecorator (UTCDateTime) sobre o mesmo TIMESTAMP: não é mudança de esquema."""
+    if isinstance(meta_type, TypeDecorator) and isinstance(insp_type, type(meta_type.impl_instance)):
+        return False
+    return None  # comparação padrão do Alembic
 
 
 def schema_diff(url: str) -> list:

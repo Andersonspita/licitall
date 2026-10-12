@@ -108,9 +108,7 @@ def test_map_item_row_ignora_item_sem_numero():
 
 def test_rotas_de_perfil_antes_da_rota_generica():
     """/matching/{id_pncp:path} engoliria /matching/profiles se vier antes."""
-    from src.main import app
+    from _rotas import rota
 
-    paths = [r.path for r in app.routes]
-    generic = paths.index("/matching/{id_pncp:path}")
-    assert paths.index("/matching/profiles") < generic
-    assert paths.index("/matching/profiles/{profile_id}/filter") < generic
+    assert rota("GET", "/matching/profiles") == "/matching/profiles"
+    assert rota("POST", "/matching/profiles/abc/filter") == "/matching/profiles/{profile_id}/filter"

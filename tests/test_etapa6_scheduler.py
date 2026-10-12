@@ -67,12 +67,10 @@ def test_next_run():
 
 
 def test_rotas_antes_da_generica():
-    from src.main import app
+    from _rotas import rota
 
-    paths = [r.path for r in app.routes]
-    generic = paths.index("/matching/{id_pncp:path}")
-    assert paths.index("/matching/profiles/{profile_id}/agendamento") < generic
-    assert paths.index("/matching/digest/run-due") < generic
+    assert rota("PUT", "/matching/profiles/abc/agendamento") == "/matching/profiles/{profile_id}/agendamento"
+    assert rota("POST", "/matching/digest/run-due") == "/matching/digest/run-due"
 
 
 def test_passed_today():
