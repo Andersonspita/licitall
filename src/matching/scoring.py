@@ -108,6 +108,12 @@ def score_match(
         )
         hard_fail = True
 
+    if cnae_pts == 0 and total >= REVIEW_THRESHOLD:
+        # Ramo conhecido dos dois lados e sem interseção: UF, porte, valor e prazo sozinhos (até 65 pts)
+        # não tornam o edital relevante.
+        total = REVIEW_THRESHOLD - 5
+        explanations.append(f"Ramo incompatível (CNAE) → teto {total:.0f}, abaixo de revisar")
+
     if hard_fail and total >= REVIEW_THRESHOLD:
         total = min(total * 0.25, 35.0)
         explanations.append(f"Elegibilidade hard-fail → score ajustado para {total:.1f}")

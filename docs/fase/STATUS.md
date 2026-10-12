@@ -2,7 +2,7 @@
 
 > Fonte de verdade da fase atual para IAs e desenvolvedores. Atualizar a cada entrega significativa.
 
-**Última atualização:** 2026-09-21  
+**Última atualização:** 2026-10-12  
 **Fase atual:** 6 — integração operacional (pipeline + health deps + smoke Compose)  
 **Repositório:** https://github.com/Andersonspita/licitall  
 **Marco legal:** Lei Federal nº 14.133/2021 + LC 123/2006 + disclaimer Lei 8.906/1994
@@ -148,11 +148,17 @@ Evolution API v2.3.7 subida pelo Compose (`redis` + `evolution-api`; o `evolutio
 
 ---
 
+## Match inverso por CNPJ com o banco real (2026-10-12)
+
+Preparação para testar `POST /matching/company` com uma empresa real. **Corrigido:** (1) **o sync do PNCP não gravava nada com o SQLModel atual** (0.0.48, o que a CI e a imagem Docker instalam): ele mapeia `datetime` para um tipo que recusa data sem fuso, e as datas do PNCP são gravadas em horário de Brasília sem fuso. As 3 colunas de data de `tender_ingest` agora têm tipo explícito `TIMESTAMP` (igual à migração 0001); ambientes com SQLModel antigo não eram afetados; (2) o match inverso lia os 100 editais **mais recentemente atualizados**, abertos ou não (com 1.458 editais da BA, ~7% eram avaliados e vencidos entravam): agora lê só os abertos (`open_tenders_clause`, mesma regra de `is_open_for_proposals`), os que encerram primeiro antes, até 5.000; (3) os itens de `itens_contratacao` não entravam na inferência de CNAE (só os do `payload`): agora entram; (4) edital de **ramo incompatível** virava REVIEW só com UF, porte, valor e prazo (até 65 pts): agora teto 35 (SKIP); edital sem CNAE inferido continua podendo ir a REVIEW; (5) "gêneros alimentícios" não era reconhecido (agora CNAE de comércio atacadista de alimentos 4639701/4691500). Novo `scripts/match_empresa_real.py` (relatório legível; `--minha-receita https://minhareceita.org` dispensa o ETL). Testes: `tests/test_match_company_integration.py` (3, Postgres real) + 2 em `test_fase4_matching.py`; suíte completa 194 com `REQUIRE_DB=1`. Validado com banco local e Minha Receita simulada. **Não validado com dados reais:** este ambiente não alcança PNCP nem minhareceita.org. **Limite conhecido:** o mapa de CNAE tem ~19 regras; editais fora dele recebem CNAE parcial (+12) e tendem a REVIEW. Ampliar o mapa a partir do resultado com a empresa real.
+
+---
+
 ## Próxima ação recomendada
 
-1. Sync Brasil: `POST /ingestion/pncp/sync/async` com `{ "uf": "BR", "only_open": true }` (Dashboard já usa BR)  
-2. Minha Receita: `docker compose --profile full up -d` + ETL  
-3. Evolution QR: conectar instância e testar digest real  
-4. Loop end-to-end com 1 edital no Postgres
+1. Rodar `python -m scripts.match_empresa_real <CNPJ> --uf <UF> --minha-receita https://minhareceita.org` com uma empresa real e avaliar o top 15 (ampliar `cnae_map.py` com os objetos não reconhecidos)
+2. Repetir a sonda da API de itens do PNCP (`/itens`); se seguir fora, decidir o casamento de editais abertos sem itens
+3. Migração `0003`: chave estrangeira em `perfis_interesse.empresa_id`
+4. Publicação num servidor real; fixar versões das imagens `evolution-api` e `minha-receita`
 
 Script local (sem Docker): `scripts/smoke_local.py` · Doc: `docs/tecnica/SMOKE_LOCAL.md` · Fase 6: `docs/tecnica/FASE6_INTEGRACAO.md`

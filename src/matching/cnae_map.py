@@ -12,9 +12,11 @@ from typing import Iterable
 # (palavras-chave no objeto, CNAEs candidatos)
 _CNAE_RULES: tuple[tuple[tuple[str, ...], tuple[str, ...]], ...] = (
     (("software", "sistema de informação", "ti ", "tecnologia da informação", "informática", "desenvolvimento de sistema"), ("6201501", "6202300", "6203100", "6204000", "6209100")),
-    (("limpeza", "conservação predial", " asymmetricio"), ("8121400", "8129000")),
+    (("limpeza", "conservação predial"), ("8121400", "8129000")),
     (("vigilância", "vigilancia", "segurança patrimonial", "monitoramento"), ("8011101", "8011102")),
-    (("alimentação", "refeição", "merenda", "canteen", "buffet"), ("5620101", "5611201")),
+    (("alimentação", "refeição", "merenda", "buffet"), ("5620101", "5611201")),
+    # Fornecimento de alimentos (atacado), diferente de servir refeições (restaurante/fornecimento de refeições).
+    (("gêneros alimentícios", "generos alimenticios", "gênero alimentício", "genero alimenticio", "produtos alimentícios", "hortifruti"), ("4639701", "4691500")),
     (("medicamento", "farmácia", "farmaceutic", "hospitalar"), ("4771701", "4644301")),
     (("material de escritório", "papelaria", "expediente"), ("4761003", "4689399")),
     (("combustível", "diesel", "gasolina", "etanol"), ("4731800", "4682600")),

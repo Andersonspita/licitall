@@ -27,9 +27,11 @@ class TenderIngest(SQLModel, table=True):
     objeto_resumido: Optional[str] = Field(default=None, sa_column=Column(Text))
     valor_total_estimado: Optional[float] = None
     situacao: Optional[str] = Field(default=None, max_length=128)
-    data_publicacao: Optional[datetime] = None
-    data_abertura_propostas: Optional[datetime] = None
-    data_encerramento_propostas: Optional[datetime] = None
+    # Datas do PNCP: horário de Brasília sem fuso (coluna TIMESTAMP, ver migração 0001). Tipo explícito porque o
+    # SQLModel recente mapeia `datetime` para um tipo que recusa valor sem fuso.
+    data_publicacao: Optional[datetime] = Field(default=None, sa_column=Column(DateTime(timezone=False)))
+    data_abertura_propostas: Optional[datetime] = Field(default=None, sa_column=Column(DateTime(timezone=False)))
+    data_encerramento_propostas: Optional[datetime] = Field(default=None, sa_column=Column(DateTime(timezone=False)))
     status: str = Field(default="INGESTED", max_length=32, index=True)
     payload: dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSONB, nullable=False))
     error_message: Optional[str] = Field(default=None, sa_column=Column(Text))

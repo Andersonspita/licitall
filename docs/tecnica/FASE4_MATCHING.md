@@ -34,6 +34,8 @@ Marco: Lei 14.133/2021 Art. 4º c/c LC 123/2006 Art. 48.
 
 **Recomendação:** BID ≥ 70 · REVIEW 40–69 · SKIP < 40 (ou hard-fail de elegibilidade).
 
+Ramo incompatível (CNAE conhecido no edital e na empresa, sem interseção): teto 35, ou seja SKIP. Sem isso, UF + porte + valor + prazo davam até 65 pts a um edital de outro ramo. Edital sem CNAE inferido continua com pontuação parcial (+12) e pode ir para REVIEW.
+
 Demais em lote exclusivo: penalização forte (teto ~35) + hard-fail YAML.
 
 ## Elegibilidade (YAML)
@@ -67,7 +69,17 @@ Body inverso:
 }
 ```
 
-Sem `tenders`, usa editais sincronizados em Postgres (`POST /ingestion/pncp/sync`).
+Sem `tenders`, usa editais sincronizados em Postgres (`POST /ingestion/pncp/sync`): só os **ainda abertos** (situação de recebimento e encerramento das propostas no futuro, mesma regra da ingestão), os que encerram primeiro antes, até 5.000. As descrições de `itens_contratacao` entram na inferência de CNAE.
+
+### Teste com uma empresa real
+
+```bash
+python -m scripts.match_empresa_real 12345678000199 --uf BA --json resultado.json
+# sem a base local (ETL), usa a API pública, de mesmo formato:
+python -m scripts.match_empresa_real 12345678000199 --uf BA --minha-receita https://minhareceita.org
+```
+
+Mostra a empresa, quantos editais tinham itens e CNAE inferido, a contagem BID/REVIEW/SKIP e o top N com os 5 fatores. Não grava nada.
 
 ## Pré-requisito operacional
 
