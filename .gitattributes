@@ -1,0 +1,10 @@
+# Arquivos que rodam em container Linux precisam de fim de linha LF (CRLF quebra o #! do shell).
+*.sh text eol=lf
+Dockerfile text eol=lf
+.dockerignore text eol=lf
+docker/Caddyfile text eol=lf
+*.py text eol=lf
+*.ini text eol=lf
+*.mako text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
