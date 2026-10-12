@@ -15,6 +15,7 @@ from sqlmodel import SQLModel
 
 from alembic.script import ScriptDirectory
 
+from _integracao import sem_banco
 from src.db.migrate import BASELINE, alembic_config, migrate, schema_diff
 
 HEAD = ScriptDirectory.from_config(alembic_config()).get_current_head()
@@ -67,7 +68,7 @@ def banco():
     try:
         _admin(f'create database "{nome}"')
     except Exception as exc:  # noqa: BLE001
-        pytest.skip(f"PostgreSQL indisponível: {exc}")
+        sem_banco(exc)
     url = str(make_url(BASE_URL).set(database=nome).render_as_string(hide_password=False))
     yield url
     _admin(f'drop database if exists "{nome}" with (force)')

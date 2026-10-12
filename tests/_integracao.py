@@ -19,6 +19,14 @@ ADMIN_EMAIL = f"itest-admin-{TAG}@teste.com.br"
 SENHA = "senha-de-teste-123"
 
 
+def sem_banco(exc: Exception) -> None:
+    """Sem PostgreSQL: pula localmente, mas falha quando REQUIRE_DB=1 (CI não pode passar em silêncio)."""
+    msg = f"PostgreSQL indisponível para o teste de integração: {exc}"
+    if os.environ.get("REQUIRE_DB") == "1":
+        pytest.fail(msg)
+    pytest.skip(msg)
+
+
 def _email(nome: str) -> str:
     return f"itest-{nome}-{TAG}@teste.com.br"
 
@@ -41,7 +49,7 @@ async def ambiente(monkeypatch):
         async with dbmod.get_engine().connect() as c:
             await c.execute(text("select 1"))
     except Exception as exc:  # noqa: BLE001
-        pytest.skip(f"PostgreSQL indisponível para o teste de integração: {exc}")
+        sem_banco(exc)
 
     from src.auth.routes import throttle
     from src.main import app
