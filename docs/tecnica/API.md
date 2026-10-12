@@ -176,7 +176,7 @@ Retorna empresas ATIVAS ranqueadas com score explicável, `recommendation` (BID/
 ## `POST /matching/company`
 
 Match inverso CNPJ → oportunidades. Body: `{ "cnpj", "tenders"?, "limit", "min_score", "require_proximity", "uf" }`.  
-Sem `tenders`, lê `tender_ingest` (Postgres). Ver [FASE4_MATCHING.md](FASE4_MATCHING.md).
+Sem `tenders`, lê os editais **ainda abertos** de `tender_ingest` (Postgres), com os itens do banco na inferência de CNAE. Ver [FASE4_MATCHING.md](FASE4_MATCHING.md).
 
 ## `POST /matching/{id_pncp}`
 

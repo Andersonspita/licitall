@@ -12,7 +12,8 @@ from src.matching.cnae_map import infer_cnaes_from_text, merge_cnaes
 from src.matching.eligibility import EligibilityVerdict, evaluate_eligibility
 from src.matching.scoring import REVIEW_THRESHOLD, ScoreBreakdown, recommend, score_match
 from src.models.enums import CompanySize
-from src.models.tables import TenderIngest
+from src.ingestion.service import open_tenders_clause
+from src.models.tables import TenderIngest, TenderItemRow
 
 
 class ScoreFactors(BaseModel):
@@ -91,6 +92,10 @@ class CompanyOpportunityResult(BaseModel):
     marco_legal: str = f"Lei 14.133/2021 c/c {LC123_REF}"
 
 
+# Pontuar é barato (Python puro); o teto só protege a memória com bases muito grandes.
+MAX_TENDERS_AVALIADOS = 5000
+
+
 def _is_active(company: dict[str, Any]) -> bool:
     return (
         company.get("situacao_cadastral") == SITUACAO_ATIVA
@@ -135,8 +140,27 @@ def resolve_exclusivo_me_epp(tender: dict[str, Any]) -> bool:
     return False
 
 
-def tender_from_ingest(row: TenderIngest) -> dict[str, Any]:
-    """Normaliza linha de `tender_ingest` para o formato de scoring."""
+async def _itens_por_edital(session: AsyncSession, ids: list[str]) -> dict[str, list[dict[str, Any]]]:
+    """Só a descrição, para indicar o ramo. A exclusividade ME/EPP é por item: um item exclusivo não
+    torna o edital inteiro exclusivo (isso penalizaria empresas "Demais" nos demais itens)."""
+    if not ids:
+        return {}
+    stmt = (
+        select(TenderItemRow.id_pncp, TenderItemRow.descricao)
+        .where(TenderItemRow.id_pncp.in_(ids))
+        .order_by(TenderItemRow.id_pncp, TenderItemRow.numero_item)
+    )
+    agrupado: dict[str, list[dict[str, Any]]] = {}
+    for id_pncp, descricao in (await session.execute(stmt)).all():
+        agrupado.setdefault(id_pncp, []).append({"descricao": descricao})
+    return agrupado
+
+
+def tender_from_ingest(row: TenderIngest, itens: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+    """Normaliza linha de `tender_ingest` para o formato de scoring.
+
+    `itens` (de `itens_contratacao`) substitui os itens do payload quando informado.
+    """
     payload = row.payload or {}
     mapped = {
         "id_pncp": row.id_pncp,
@@ -158,7 +182,7 @@ def tender_from_ingest(row: TenderIngest) -> dict[str, Any]:
         "cnaes_compativeis": payload.get("cnaes_compativeis") or [],
         "beneficios_me_epp": payload.get("beneficios_me_epp") or {},
         "exclusivo_me_epp": payload.get("exclusivo_me_epp"),
-        "itens": payload.get("itens") or [],
+        "itens": itens or payload.get("itens") or [],
     }
     if not mapped["cnaes_compativeis"]:
         mapped["cnaes_compativeis"] = resolve_cnaes(mapped)
@@ -379,14 +403,24 @@ class MatchmakingService:
         session: AsyncSession,
         *,
         uf: str | None = None,
-        limit: int = 100,
+        limit: int = MAX_TENDERS_AVALIADOS,
     ) -> list[dict[str, Any]]:
-        stmt = select(TenderIngest).order_by(TenderIngest.updated_at.desc()).limit(limit)
+        """Editais ainda abertos (situação + prazo), os que encerram primeiro antes.
+
+        Junta as descrições de `itens_contratacao` para a inferência de CNAE: sem elas, só o
+        objeto do edital indica o ramo.
+        """
+        stmt = (
+            select(TenderIngest)
+            .where(open_tenders_clause())
+            .order_by(TenderIngest.data_encerramento_propostas.asc().nulls_last(), TenderIngest.id)
+            .limit(limit)
+        )
         if uf:
             stmt = stmt.where(TenderIngest.uf == uf.upper())
-        result = await session.execute(stmt)
-        rows = result.scalars().all()
-        return [tender_from_ingest(row) for row in rows]
+        rows = (await session.execute(stmt)).scalars().all()
+        itens = await _itens_por_edital(session, [row.id_pncp for row in rows])
+        return [tender_from_ingest(row, itens.get(row.id_pncp)) for row in rows]
 
     async def match_company(
         self,
@@ -449,11 +483,15 @@ class MatchmakingService:
             tenders = await self.list_open_tenders(
                 session,
                 uf=str(prefer_uf).upper() if prefer_uf else None,
-                limit=max(limit * 5, 50),
             )
             if not tenders:
                 avisos.append(
-                    "Nenhum edital em tender_ingest. Rode POST /ingestion/pncp/sync antes do match inverso."
+                    "Nenhum edital aberto em tender_ingest. Rode POST /ingestion/pncp/sync antes do match inverso."
+                )
+            elif len(tenders) >= MAX_TENDERS_AVALIADOS:
+                avisos.append(
+                    f"Avaliados só os {MAX_TENDERS_AVALIADOS} editais abertos que encerram primeiro; "
+                    "filtre por UF para cobrir os demais."
                 )
 
         company_cnaes = set(_company_cnae_list(company))

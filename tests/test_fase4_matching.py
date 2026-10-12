@@ -246,3 +246,27 @@ async def test_match_company_inverse():
     assert len(result.opportunities) >= 1
     assert result.opportunities[0].id_pncp == "00000000000000-1-000001/2026"
     assert result.opportunities[0].recommendation in {"BID", "REVIEW"}
+
+
+def test_ramo_incompativel_nao_vira_revisar_mesmo_com_uf_porte_valor_e_prazo():
+    from src.matching.scoring import REVIEW_THRESHOLD, score_match
+
+    empresa = {"uf": "BA", "municipio": "SALVADOR", "porte": "MICRO EMPRESA", "cnae_fiscal": 8121400}
+    edital = {
+        "cnaes_compativeis": ["4761003"], "uf": "BA", "municipio": "SALVADOR", "valor_total_estimado": 30000,
+        "data_encerramento_propostas": (date.today() + timedelta(days=15)).isoformat(),
+    }
+    b = score_match(tender=edital, company=empresa)
+    assert b.cnae == 0 and b.geography == 20  # os outros fatores continuam explicados
+    assert b.total < REVIEW_THRESHOLD and b.recommendation == "SKIP"
+
+    sem_cnae = score_match(tender={**edital, "cnaes_compativeis": []}, company=empresa)
+    assert sem_cnae.recommendation in {"REVIEW", "BID"}  # ramo desconhecido continua para revisão
+
+
+def test_generos_alimenticios_e_comercio_de_alimentos_nao_restaurante():
+    from src.matching.cnae_map import infer_cnaes_from_text
+
+    for objeto in ("Aquisição de gêneros alimentícios", "AQUISICAO DE GENEROS ALIMENTICIOS PARA A MERENDA"):
+        assert "4639701" in infer_cnaes_from_text(objeto)
+    assert "4639701" not in infer_cnaes_from_text("Fornecimento de refeições")

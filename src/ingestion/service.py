@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
+from sqlalchemy import ColumnElement, and_, or_
 from sqlalchemy.dialects.postgresql import insert
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -92,6 +93,23 @@ def is_open_for_proposals(item: dict[str, Any], now: datetime | None = None) -> 
         if encerramento <= referencia:
             return False
     return True
+
+
+def open_tenders_clause(now: datetime | None = None) -> ColumnElement[bool]:
+    """Mesma regra de `is_open_for_proposals`, em SQL, para filtrar `tender_ingest` já gravado.
+
+    A regra da ingestão vale só na entrada; editais que vencem depois continuam no banco.
+    """
+    referencia = now or datetime.now(_BRT).replace(tzinfo=None)
+    situacao = TenderIngest.situacao
+    situacao_ok = or_(
+        situacao.is_(None),
+        situacao == "",
+        *[situacao.ilike(f"%{hint}%") for hint in _OPEN_STATUS_HINTS],
+    )
+    encerramento = TenderIngest.data_encerramento_propostas
+    prazo_ok = or_(encerramento.is_(None), encerramento > referencia)
+    return and_(situacao_ok, prazo_ok)
 
 
 async def upsert_tender(session: AsyncSession, mapped: dict[str, Any]) -> None:
