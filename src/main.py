@@ -58,7 +58,7 @@ from src.models.tables import (
     TenderIngest,
     Usuario,
 )
-from src.rag.embeddings import EmbeddingProvider
+from src.rag.embeddings import EmbeddingError, EmbeddingProvider
 from src.advisory import CompanyContext, build_document_kit, persist_kit
 from src.outreach import DigestItem, DigestPayload, OutreachPayload, OutreachService
 from src.parser.service import ParserService
@@ -721,7 +721,7 @@ async def match_by_profile(
     try:
         result = await profile_svc.match_full(session, profile, body.id_pncp, embedder)
     except Exception as exc:
-        if exc.__class__.__module__.startswith("openai"):
+        if isinstance(exc, EmbeddingError) or exc.__class__.__module__.startswith("openai"):
             raise HTTPException(status_code=502, detail=f"Falha no provedor de embeddings: {exc}") from exc
         raise
     if result is None:

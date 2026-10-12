@@ -53,6 +53,11 @@ class Settings(BaseSettings):
     openai_api_key: str = ""
     openai_model: str = "gpt-4o-mini"
     embedding_model: str = "text-embedding-3-small"
+    # Embeddings: auto = OpenAI se houver chave, senão Gemini se houver chave, senão hash local (dev/testes).
+    embedding_provider: str = "auto"  # auto | openai | gemini | hash
+    embedding_base_url: str = ""  # endpoint compatível com OpenAI (ex.: Ollama, FreeLLMAPI); usa OPENAI_API_KEY
+    gemini_api_key: str = ""
+    gemini_embedding_model: str = "gemini-embedding-001"
 
     @computed_field  # type: ignore[prop-decorator]
     @property

@@ -15,6 +15,7 @@ from src.rag.embeddings import EmbeddingProvider
 
 def test_provedor_hash_respeita_512_dimensoes_e_chave_de_cache(monkeypatch):
     monkeypatch.setenv("OPENAI_API_KEY", "")
+    monkeypatch.setenv("GEMINI_API_KEY", "")
     from src.config import get_settings
 
     get_settings.cache_clear()

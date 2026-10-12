@@ -117,6 +117,10 @@ Tabelas `certidoes` e `atestados` (migração `0002`), por empresa: todos os usu
 
 `.github/workflows/ci.yml`: a cada push/PR sobe PostgreSQL com pgvector e roda `pytest tests` com `REQUIRE_DB=1` (sem banco o teste **falha**, em vez de pular). A primeira execução, com as dependências mais recentes, revelou duas incompatibilidades, já corrigidas: testes de ordem de rotas (agora usam `tests/_rotas.py`) e falso positivo do `schema_diff` com `UTCDateTime` do SQLModel novo. Localmente, sem `REQUIRE_DB`, os testes de banco continuam pulando se o Postgres estiver desligado. Limite: `requirements.txt` usa versões mínimas, então uma biblioteca nova pode quebrar a CI (e a imagem) sem mudança no código.
 
+## Embeddings multi-provedor (2026-10-12)
+
+`EMBEDDING_PROVIDER` = `auto` (padrão: OpenAI se houver `OPENAI_API_KEY`, senão Gemini se houver `GEMINI_API_KEY`, senão hash local), `openai`, `gemini` ou `hash`. `EMBEDDING_BASE_URL` aponta para qualquer endpoint compatível com OpenAI (Ollama, FreeLLMAPI). Gemini: modelo `gemini-embedding-001` (`GEMINI_EMBEDDING_MODEL`), lotes de 100, 512 dimensões normalizadas, repete em 429/5xx. O cache de embeddings separa por provedor e modelo (trocar de provedor recalcula, não mistura). Testado só com respostas simuladas; **falta validar com a chave real**. `tests/conftest.py` zera as chaves nos testes. Limitação: a extração com LLM (`agents/extractor.py`) ainda usa só OpenAI.
+
 ---
 
 ## Próxima ação recomendada
