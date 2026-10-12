@@ -40,6 +40,10 @@ def load_eligibility_config(path: str | None = None) -> dict[str, Any]:
     return data
 
 
+def _moeda(valor: float) -> str:
+    return f"{valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+
 def evaluate_eligibility(
     *,
     tender: dict[str, Any],
@@ -106,7 +110,7 @@ def evaluate_eligibility(
             _apply(
                 "faixa_exclusiva_me_epp",
                 failed=porte not in {CompanySize.ME, CompanySize.EPP},
-                detail=f"valor R$ {valor:,.2f}, porte {porte.value}".replace(",", "X").replace(".", ",").replace("X", "."),
+                detail=f"valor R$ {_moeda(valor)}, porte {porte.value}",
             )
 
     # proximidade_obrigatoria

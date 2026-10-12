@@ -382,7 +382,7 @@ async def test_valor_ate_80_mil_sem_exclusividade_declarada_alerta_e_rebaixa_dem
     demais = (await svc.match_company("1", tenders=[edital], company={**base, "porte": "DEMAIS"}, min_score=0)).opportunities[0]
     me = (await svc.match_company("1", tenders=[edital], company={**base, "porte": "MICRO EMPRESA"}, min_score=0)).opportunities[0]
     assert demais.recommendation == "REVIEW" and demais.eligibility_ok  # alerta, não bloqueia: a fonte não informou
-    assert any("Art. 48" in w and "R$ 8.919,00" in w for w in demais.eligibility_warnings)
+    assert any("Art. 48" in w and w.endswith("valor R$ 8.919,00, porte DEMAIS") for w in demais.eligibility_warnings)
     assert me.recommendation == "BID" and not any("Art. 48" in w for w in me.eligibility_warnings)
     grande = (await svc.match_company("1", tenders=[{**edital, "valor_total_estimado": 300_000}],
                                       company={**base, "porte": "DEMAIS"}, min_score=0)).opportunities[0]
