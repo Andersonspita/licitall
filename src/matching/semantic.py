@@ -89,9 +89,16 @@ def cosine(a: list[float], b: list[float]) -> float:
     return dot / (na * nb) if na and nb else 0.0
 
 
-def semantic_score(similarity: float) -> float:
-    """0–25 pontos; similaridade negativa não penaliza."""
-    return round(MAX_SEMANTIC * max(0.0, min(similarity, 1.0)), 2)
+# (piso, teto) do cosseno por provedor. Modelos densos dão cosseno alto até para textos sem relação, então o cosseno
+# bruto inflaria todo item. `gemini`: medido em 240 itens reais (out/2026, 5 perfis; ver docs/fase/STATUS.md): sem relação
+# mediana 0,76 e p95 0,80; relacionados mediana 0,79 e p90 0,84. `hash` (local) já parte de ~0. `openai`: NÃO medido.
+CALIBRACAO: dict[str, tuple[float, float]] = {"gemini": (0.76, 0.86)}
+
+
+def semantic_score(similarity: float, backend: str = "hash") -> float:
+    """0–25 pontos; abaixo do piso do provedor não pontua (similaridade negativa também não penaliza)."""
+    piso, teto = CALIBRACAO.get(backend, (0.0, 1.0))
+    return round(MAX_SEMANTIC * max(0.0, min((similarity - piso) / (teto - piso), 1.0)), 2)
 
 
 def profile_description(nome: str, obrigatorias: list[str], positivas: list[str], override: str | None = None) -> str:

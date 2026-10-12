@@ -74,6 +74,14 @@ def test_cosseno_e_score_semantico():
     assert semantic_score(1.0) == 25.0
     assert semantic_score(0.5) == 12.5
     assert semantic_score(-0.4) == 0.0
+    assert semantic_score(0.5, "openai") == 12.5  # provedor sem medição: cosseno bruto
+
+
+def test_calibracao_do_gemini_desconta_o_cosseno_basal():
+    assert semantic_score(0.76, "gemini") == 0.0  # item sem relação (mediana medida) não ganha ponto
+    assert semantic_score(0.5, "gemini") == 0.0
+    assert semantic_score(0.81, "gemini") == 12.5
+    assert semantic_score(0.86, "gemini") == 25.0 and semantic_score(0.95, "gemini") == 25.0
 
 
 def test_descricao_do_perfil_e_score_final():

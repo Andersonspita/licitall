@@ -322,7 +322,7 @@ async def match_full(
     candidates: list[dict[str, Any]] = []
     for item, l2, text in scored:
         sim = cosine(profile_vec, resolution.vectors[content_hash(text)]) if profile_vec and text else 0.0
-        sem = semantic_score(sim)
+        sem = semantic_score(sim, embedder.backend)
         final = final_score(l2.score_catmat, l2.score_lexico, sem)
         if final["score_total"] <= 0:
             continue
