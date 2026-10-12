@@ -126,7 +126,7 @@ async def test_falha_do_provedor_vira_aviso_e_match_segue(ambiente):
     finally:
         await service.aclose()
     assert r.opportunities[0].recommendation == "REVIEW" and r.opportunities[0].score == TETO_RAMO_DESCONHECIDO
-    assert any("cota esgotada" in a for a in r.avisos)
+    assert any("cota esgotada" in a and "parcial: 0 de 1" in a for a in r.avisos)
 
 
 @pytest.mark.asyncio
@@ -142,3 +142,34 @@ async def test_sem_chave_de_embedding_avisa_e_nao_muda_nada(ambiente):
         await service.aclose()
     assert r.opportunities[0].score == TETO_RAMO_DESCONHECIDO
     assert any("GEMINI_API_KEY" in a for a in r.avisos)
+
+
+@pytest.mark.asyncio
+async def test_falha_no_meio_guarda_o_progresso_no_cache(ambiente):
+    from src.matching.embedding_cache import vectors_with_cache
+
+    class FalhaNoTerceiro(EmbedderFalso):
+        async def embed(self, texts):
+            if len(self.textos) >= 2:
+                raise RuntimeError("cota diária do Gemini esgotada")
+            return await super().embed(texts)
+
+    _, dbmod = ambiente
+    textos = [f"objeto {TAG} {i}" for i in range(4)]
+    emb = FalhaNoTerceiro()
+    try:
+        async with dbmod.get_session_factory()() as s:
+            r = await vectors_with_cache(s, emb, textos, parcial=True, batch_size=1)
+            assert len(r.vectors) == 2 and r.pendentes == 2 and "cota" in str(r.erro)
+            with pytest.raises(RuntimeError):  # sem modo parcial a falha sobe (comportamento dos perfis)
+                await vectors_with_cache(s, emb, textos, batch_size=1)
+
+            normal = EmbedderFalso()
+            normal.cache_key = emb.cache_key
+            r2 = await vectors_with_cache(s, normal, textos, parcial=True, batch_size=1)
+            assert len(r2.vectors) == 4 and r2.erro is None
+            assert sorted(normal.textos) == sorted(textos[2:])  # só os que faltavam
+    finally:
+        async with dbmod.get_session_factory()() as s:
+            await s.execute(text("delete from embeddings_cache where backend = :b"), {"b": emb.cache_key})
+            await s.commit()

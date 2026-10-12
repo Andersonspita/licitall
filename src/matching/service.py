@@ -124,13 +124,19 @@ async def _aplicar_ramo_semantico(
             avisos.append(f"Provedor {embedder.backend} sem limiares de ramo calibrados: comparação por significado desligada.")
         return
     try:
-        res = await vectors_with_cache(session, embedder, descricoes + [rs.texto_objeto(v) for v in sem_ramo])
-    except Exception as exc:  # noqa: BLE001 (cota, rede, chave: o match segue sem a camada semântica)
+        res = await vectors_with_cache(session, embedder, descricoes + [rs.texto_objeto(v) for v in sem_ramo], parcial=True)
+    except Exception as exc:  # noqa: BLE001 (banco/cache; o provedor já é tratado no modo parcial)
         await session.rollback()
-        avisos.append(f"Comparação por significado indisponível ({type(exc).__name__}: {exc}); editais sem ramo ficam para revisão.")
+        avisos.append(f"Comparação por significado indisponível ({exc}); editais sem ramo ficam para revisão.")
         return
-    for id_pncp, ramo in rs.avaliar(sem_ramo, descricoes, res.vectors, limiares).items():
+    avaliados = rs.avaliar(sem_ramo, descricoes, res.vectors, limiares)
+    for id_pncp, ramo in avaliados.items():
         next(v for v in sem_ramo if v["id_pncp"] == id_pncp)["ramo_semantico"] = ramo.as_dict()
+    if res.erro is not None:
+        avisos.append(
+            f"Comparação por significado parcial: {len(avaliados)} de {len(sem_ramo)} editais sem ramo comparados; "
+            f"o resto fica para revisão ({res.erro}). O que foi calculado ficou no cache: rode de novo depois para completar."
+        )
 
 
 # Pontuar é barato (Python puro); o teto só protege a memória com bases muito grandes.

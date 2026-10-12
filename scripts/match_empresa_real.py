@@ -118,7 +118,7 @@ def medir_ramo(ops: list[Any]) -> None:
     """Distribuição da similaridade objeto × CNAE, com exemplos por faixa, para calibrar os limiares."""
     com = sorted((o for o in ops if o.ramo_semantico), key=lambda o: -o.ramo_semantico["similaridade"])
     if not com:
-        print("\nNenhum edital comparado por significado (sem GEMINI_API_KEY, ou todos com ramo pelo mapa).")
+        print("\nNenhum edital comparado por significado (veja o AVISO no início; sem aviso, todos tiveram ramo pelo mapa).")
         return
     sims = [o.ramo_semantico["similaridade"] for o in com]
     print(f"\nSimilaridade objeto × CNAE em {len(com)} editais: máx {sims[0]:.3f} · mediana {sims[len(sims) // 2]:.3f} · mín {sims[-1]:.3f}")

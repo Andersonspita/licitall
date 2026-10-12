@@ -9,6 +9,7 @@ from __future__ import annotations
 import hashlib
 import re
 from dataclasses import dataclass, field
+from collections.abc import Awaitable, Callable
 from typing import Any, Protocol
 
 from src.matching.hard_filters import normalize_text
@@ -51,6 +52,8 @@ class CacheResolution:
     new_entries: dict[str, tuple[str, list[float]]] = field(default_factory=dict)  # hash → (texto, vetor)
     api_texts_sent: int = 0
     api_calls: int = 0
+    erro: Exception | None = None  # só no modo parcial: falha que interrompeu os lotes restantes
+    pendentes: int = 0  # textos que ficaram sem vetor por causa do erro
 
 
 async def resolve_vectors(
@@ -59,8 +62,14 @@ async def resolve_vectors(
     embedder: Embedder,
     *,
     batch_size: int = BATCH_SIZE,
+    on_batch: Callable[[dict[str, tuple[str, list[float]]]], Awaitable[None]] | None = None,
+    parcial: bool = False,
 ) -> CacheResolution:
-    """Devolve o vetor de cada texto, chamando o provedor só para textos inéditos (em lotes)."""
+    """Devolve o vetor de cada texto, chamando o provedor só para textos inéditos (em lotes).
+
+    `on_batch` recebe os vetores novos de cada lote assim que chegam (para gravar o progresso). Com `parcial`, uma
+    falha do provedor interrompe os lotes restantes e fica em `erro`, em vez de descartar o que já veio.
+    """
     result = CacheResolution()
     pending: dict[str, str] = {}
     for text in texts:
@@ -72,12 +81,21 @@ async def resolve_vectors(
     hashes = list(pending)
     for start in range(0, len(hashes), batch_size):
         chunk = hashes[start : start + batch_size]
-        vectors = await embedder.embed([pending[h] for h in chunk])
+        try:
+            vectors = await embedder.embed([pending[h] for h in chunk])
+        except Exception as exc:
+            if not parcial:
+                raise
+            result.erro, result.pendentes = exc, len(hashes) - start
+            break
         result.api_calls += 1
         result.api_texts_sent += len(chunk)
-        for h, vec in zip(chunk, vectors):
+        lote = {h: (pending[h], vec) for h, vec in zip(chunk, vectors)}
+        for h, (_, vec) in lote.items():
             result.vectors[h] = vec
-            result.new_entries[h] = (pending[h], vec)
+        result.new_entries.update(lote)
+        if on_batch:
+            await on_batch(lote)
     return result
 
 
