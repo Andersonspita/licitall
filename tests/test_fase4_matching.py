@@ -322,3 +322,14 @@ def test_cnae_principal_pesa_mais_que_secundario():
     moveis = score_match(tender={"uf": "BA", "cnaes_compativeis": ["3101200", "4754701"]}, company=empresa)
     assert papelaria.cnae == WEIGHT_CNAE and moveis.cnae == WEIGHT_CNAE_SECUNDARIO
     assert papelaria.total > moveis.total
+
+
+def test_locacao_e_outro_ramo_que_venda():
+    from src.matching.cnae_map import infer_cnaes_from_text as f
+
+    locacao = f("LOCAÇÃO DE EQUIPAMENTOS DE IMPRESSÃO, INCLUINDO PLOTTER, SCANNER E IMPRESSORAS MULTIFUNCIONAIS")
+    assert locacao == ["7733100"]  # aluguel de máquinas de escritório, não comércio de informática
+    assert "4751201" in f("fornecimento de computadores de mesa, notebooks e impressoras")
+    assert "4754701" not in f("fornecimento de computadores de mesa")  # "mesa" aqui não é móvel
+    assert f("Locação de veículos tipo pick-up") == ["7711000", "7719599"]
+    assert "4511101" in f("Aquisição de veículos 0 km")

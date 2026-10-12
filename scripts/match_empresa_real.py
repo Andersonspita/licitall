@@ -86,9 +86,12 @@ async def main(args: argparse.Namespace) -> None:
     com_cnae = sum(1 for t in editais if t.get("cnaes_compativeis"))
     ops = result.opportunities
     recs = Counter(o.recommendation for o in ops)
-    cnae_ok = sum(1 for o in ops if o.factors.cnae >= 35)
+    principal = [o for o in ops if o.factors.cnae >= 35]
+    secundario = sum(1 for o in ops if 0 < o.factors.cnae < 35 and not o.ramo_semantico and o.factors.cnae != 12)
+    semantico = sum(1 for o in ops if (o.ramo_semantico or {}).get("status") == "compativel")
     print(f"\nEditais abertos avaliados: {len(editais)}{f' (UF {args.uf.upper()})' if args.uf else ''}")
-    print(f"  com itens no banco: {com_itens} · com CNAE inferido: {com_cnae} · CNAE compatível com a empresa: {cnae_ok}")
+    print(f"  com itens no banco: {com_itens} · com CNAE inferido: {com_cnae}")
+    print(f"  do ramo da empresa: {len(principal)} pelo CNAE principal · {secundario} só por secundário · {semantico} por significado")
     print(f"  BID: {recs['BID']} · REVIEW: {recs['REVIEW']} · SKIP: {recs['SKIP']}")
 
     print(f"\nTop {args.top}:")
@@ -103,6 +106,13 @@ async def main(args: argparse.Namespace) -> None:
             print(f"    ramo por significado: {r['status']} (similaridade {r['similaridade']:.3f} com \"{r['referencia']}\")")
         for motivo in o.eligibility_failures:
             print(f"    ✗ {motivo}")
+
+    fora = [o for o in principal if o not in ops[: args.top]]
+    if fora:
+        print(f"\nDo CNAE principal, fora do top {args.top}:")
+        for o in fora:
+            motivo = "; ".join(o.eligibility_failures) or f"{o.score:.0f} pts"
+            print(f"  [{o.recommendation}] {(o.objeto_resumido or '').strip()[:90]} — {motivo}")
 
     if args.medir_ramo:
         medir_ramo(ops)

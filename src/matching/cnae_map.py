@@ -10,10 +10,10 @@ import re
 import unicodedata
 from typing import Iterable
 
-# (palavras-chave no objeto, CNAEs candidatos). Casam como PALAVRA INTEIRA, sem acento e sem caixa, aceitando plural
+# (palavras-chave no objeto, CNAEs candidatos[, exceto]). Casam como PALAVRA INTEIRA, sem acento e sem caixa, aceitando plural
 # ("computador" casa "computadores"). Termos ambíguos só com contexto: "servidor" sozinho é servidor público,
 # "confecção" sozinha pode ser de próteses, "obra" sozinha aparece em "mão de obra", "cadeira" em "braçadeira".
-_CNAE_RULES: tuple[tuple[tuple[str, ...], tuple[str, ...]], ...] = (
+_CNAE_RULES: tuple[tuple[tuple[str, ...], ...], ...] = (
     (("software", "sistema de informação", "sistemas de informação", "tecnologia da informação", "informática",
       "desenvolvimento de sistema"), ("6201501", "6202300", "6203100", "6204000", "6209100")),
     (("limpeza", "conservação predial"), ("8121400", "8129000")),
@@ -27,7 +27,12 @@ _CNAE_RULES: tuple[tuple[tuple[str, ...], tuple[str, ...]], ...] = (
       "materiais de expediente", "expediente", "material escolar", "materiais escolares", "kit escolar", "resma",
       "papel a4", "papel sulfite", "caneta esferográfica"), ("4647801", "4761003", "4689399")),
     (("combustível", "diesel", "gasolina", "etanol"), ("4731800", "4682600")),
-    (("veículo", "frota", "automóvel", "caminhão", "ônibus"), ("4511101", "4921301", "4922102")),
+    # Aluguel é outro ramo (CNAE 77xx) que vender ou operar: "exceto" tira o edital da regra de venda.
+    (("veículo", "frota", "automóvel", "caminhão", "ônibus"), ("4511101", "4921301", "4922102"), ("locação", "aluguel")),
+    (("locação de veículo", "aluguel de veículo", "locação de automóvel", "locação de caminhão"), ("7711000", "7719599")),
+    (("locação de impressora", "locação de equipamentos de impressão", "locação de equipamento de impressão",
+      "outsourcing de impressão", "locação de computador", "locação de notebook", "locação de equipamentos de informática",
+      "locação de multifuncional"), ("7733100",)),
     (("obras de", "execução de obra", "obra pública", "construção civil", "reforma predial", "engenharia civil", "pavimentação"),
      ("4120400", "4299599", "7112000")),
     (("manutenção predial", "instalação elétrica", "instalações elétricas", "hidráulica", "ar-condicionado", "ar condicionado"),
@@ -39,9 +44,11 @@ _CNAE_RULES: tuple[tuple[tuple[str, ...], tuple[str, ...]], ...] = (
       "escritório de advocacia", "sociedade de advogados", "representação judicial", "patrocínio judicial"), ("6911701",)),
     (("contábil", "contabilidade", "auditoria independente"), ("6920601", "6920602")),
     (("uniforme", "fardamento", "vestuário", "confecção de uniforme", "confecção de roupa"), ("1412601", "4781400")),
-    (("mobiliário", "móveis", "cadeira", "mesa", "armário", "estante"), ("3101200", "4754701")),
+    # "mesa" sozinha aparece em "computador de mesa", "mesa cirúrgica", "mesa de som".
+    (("mobiliário", "móveis", "cadeira", "mesa de escritório", "mesa de reunião", "mesa escolar", "conjunto de mesa",
+      "armário", "estante"), ("3101200", "4754701")),
     (("equipamento de informática", "equipamentos de informática", "notebook", "computador", "servidor de rede", "servidores de rede",
-      "impressora", "tablet"), ("4751201", "2621300")),
+      "impressora", "tablet"), ("4751201", "2621300"), ("locação", "aluguel", "outsourcing")),
     (("internet", "link de dados", "telecom", "telefonia"), ("6110801", "6120501", "6190601")),
     (("coleta de lixo", "resíduos sólidos", "coleta de resíduo", "limpeza urbana"), ("3811400", "3821100")),
     (("jardinagem", "paisagismo", "poda"), ("8130300",)),
@@ -58,15 +65,17 @@ def _padrao(keywords: tuple[str, ...]) -> re.Pattern[str]:
     return re.compile(rf"(?<![a-z0-9])(?:{alternativas})(?:e?s)?(?![a-z0-9])")
 
 
-_REGRAS = tuple((_padrao(keywords), codes) for keywords, codes in _CNAE_RULES)
+_REGRAS = tuple(
+    (_padrao(regra[0]), regra[1], _padrao(regra[2]) if len(regra) > 2 else None) for regra in _CNAE_RULES
+)
 
 
 def infer_cnaes_from_text(text: str, *, limit: int = 8) -> list[str]:
     low = _sem_acento(text or "")
     found: list[str] = []
     seen: set[str] = set()
-    for padrao, codes in _REGRAS:
-        if padrao.search(low):
+    for padrao, codes, exceto in _REGRAS:
+        if padrao.search(low) and not (exceto and exceto.search(low)):
             for code in codes:
                 if code not in seen:
                     seen.add(code)
