@@ -204,3 +204,19 @@ def test_0003_downgrade_volta_para_texto(banco, monkeypatch):
     command.downgrade(alembic_config(banco), "0002")
     assert _query(banco, "select data_type from information_schema.columns where table_name='perfis_interesse' and column_name='empresa_id'") == [("character varying",)]
     assert _query(banco, "select id::text from perfis_interesse") == [(valido,)]
+
+
+def test_banco_legado_antigo_e_adotado_sem_falsa_divergencia(banco):
+    """Legado criado com modelos antigos (empresa_id texto): o que as migrações novas mudam não é divergência."""
+    _create_all(banco)
+
+    async def como_antes():
+        eng = create_async_engine(banco)
+        async with eng.begin() as c:
+            await c.execute(text("alter table perfis_interesse drop constraint perfis_interesse_empresa_id_fkey"))
+            await c.execute(text("alter table perfis_interesse alter column empresa_id type varchar(64) using empresa_id::text"))
+        await eng.dispose()
+
+    asyncio.run(como_antes())
+    assert migrate(banco, strict=True) == "banco legado adotado na migração-base"
+    assert schema_diff(banco) == []
