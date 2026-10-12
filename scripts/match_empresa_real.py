@@ -18,6 +18,8 @@ import os
 from collections import Counter
 from typing import Any
 
+PAUSA_ENTRE_PAGINAS = 1.5  # segundos; o PNCP responde 429 a sequências rápidas
+
 
 def _moeda(valor: float | None) -> str:
     if valor is None:
@@ -100,19 +102,52 @@ async def main(args: argparse.Namespace) -> None:
 
 
 async def sincronizar(uf: str | None, dias: int) -> None:
+    """Editais abertos da UF nos últimos `dias`, página a página, com a mesma espera em 429 do sync da API.
+
+    Uma modalidade que falha não derruba as outras; cada página é gravada assim que chega.
+    """
     from datetime import date, timedelta
 
+    from src.config import get_settings
     from src.db import get_session_factory
     from src.ingestion.client import PncpClient
-    from src.ingestion.service import ingest_publicacoes
+    from src.ingestion.jobs import _fetch_page_with_retry
+    from src.ingestion.service import is_open_for_proposals, map_pncp_item, upsert_tender
+    from src.models.enums import DEFAULT_INGESTION_MODALITIES
 
     if not uf:
         raise SystemExit("--sincronizar exige --uf (para o Brasil inteiro use o sync da API, que vai UF a UF).")
-    final = date.today()
-    print(f"Sincronizando editais abertos de {uf.upper()} publicados de {final - timedelta(days=dias)} a {final}...")
+    uf, final = uf.upper(), date.today()
+    inicial = final - timedelta(days=dias)
+    print(f"Sincronizando editais abertos de {uf} publicados de {inicial} a {final} (o PNCP limita pedidos; pode demorar)...")
+    gravados, falhas = 0, []
     async with get_session_factory()() as session, PncpClient() as client:
-        n = await ingest_publicacoes(session, client, data_inicial=final - timedelta(days=dias), data_final=final, uf=uf.upper())
-    print(f"{n} editais abertos gravados ou atualizados.")
+        for modalidade in DEFAULT_INGESTION_MODALITIES:
+            pagina, total = 1, 1
+            try:
+                while pagina <= total:
+                    async def avisar(tentativa: int, motivo: str, espera: float) -> None:
+                        print(f"  {modalidade.value} p.{pagina}: {motivo}, nova tentativa em {espera:.0f}s")
+
+                    payload = await _fetch_page_with_retry(
+                        client, data_inicial=inicial, data_final=final, modalidade=modalidade, uf=uf, pagina=pagina,
+                        max_attempts=max(1, get_settings().pncp_page_retries), on_retry=avisar,
+                    )
+                    total = max(1, int(payload.get("totalPaginas") or 1))
+                    for item in payload.get("data") or []:
+                        if is_open_for_proposals(item):
+                            await upsert_tender(session, map_pncp_item(item))
+                            gravados += 1
+                    await session.commit()
+                    print(f"  {modalidade.value} p.{pagina}/{total} · {gravados} abertos até agora")
+                    if payload.get("empty") or pagina >= total:
+                        break
+                    pagina += 1
+                    await asyncio.sleep(PAUSA_ENTRE_PAGINAS)
+            except Exception as exc:  # noqa: BLE001
+                falhas.append(f"{modalidade.value}: {type(exc).__name__}")
+                print(f"  {modalidade.value}: desisti na p.{pagina} ({type(exc).__name__}); seguindo com o que já foi gravado")
+    print(f"{gravados} editais abertos gravados ou atualizados." + (f" Falhas: {', '.join(falhas)}." if falhas else ""))
 
 
 if __name__ == "__main__":
