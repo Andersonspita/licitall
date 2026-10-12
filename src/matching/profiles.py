@@ -47,7 +47,7 @@ def _clean_terms(terms: list[str]) -> list[str]:
 async def create_profile(
     session: AsyncSession,
     *,
-    empresa_id: str,
+    empresa_id: uuid.UUID,
     nome_perfil: str,
     ufs_permitidas: list[str],
     valor_minimo_item: float = 0.0,
@@ -93,7 +93,7 @@ async def load_profile_view(session: AsyncSession, profile: InterestProfile) -> 
         palavras[rule.tipo].append(rule.termo)
     return {
         "id": str(profile.id),
-        "empresa_id": profile.empresa_id,
+        "empresa_id": str(profile.empresa_id),
         "nome_perfil": profile.nome_perfil,
         "ufs_permitidas": list(profile.ufs_permitidas),
         "valor_minimo_item": profile.valor_minimo_item,
@@ -109,7 +109,7 @@ async def get_profile(session: AsyncSession, profile_id: uuid.UUID) -> InterestP
     return await session.get(InterestProfile, profile_id)
 
 
-async def list_profiles(session: AsyncSession, empresa_id: str) -> list[InterestProfile]:
+async def list_profiles(session: AsyncSession, empresa_id: uuid.UUID) -> list[InterestProfile]:
     stmt = select(InterestProfile).where(InterestProfile.empresa_id == empresa_id).order_by(
         InterestProfile.created_at
     )

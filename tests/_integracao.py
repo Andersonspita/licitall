@@ -62,7 +62,7 @@ async def ambiente(monkeypatch):
     yield novo_cliente, dbmod
 
     async with dbmod.get_session_factory()() as s:
-        await s.execute(text("delete from perfis_interesse where empresa_id in (select id::text from empresas where nome like :p)"), {"p": f"ITEST {TAG}%"})
+        await s.execute(text("delete from perfis_interesse where empresa_id in (select id from empresas where nome like :p)"), {"p": f"ITEST {TAG}%"})
         await s.execute(text("delete from usuarios where email like :p"), {"p": f"itest-%-{TAG}@teste.com.br"})
         await s.execute(text("delete from empresas where nome like :p"), {"p": f"ITEST {TAG}%"})
         await s.commit()

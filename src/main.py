@@ -589,7 +589,7 @@ class DigestFromCompanyRequest(BaseModel):
 async def owned_profile(session: AsyncSession, user: Usuario, profile_id: uuid.UUID) -> InterestProfile:
     """Perfil da empresa do usuário. De outra empresa responde 404 (não revela que existe)."""
     profile = await profile_svc.get_profile(session, profile_id)
-    if profile is None or profile.empresa_id != str(user.empresa_id):
+    if profile is None or profile.empresa_id != user.empresa_id:
         raise HTTPException(status_code=404, detail="Perfil não encontrado")
     return profile
 
@@ -628,7 +628,7 @@ async def create_interest_profile(
         raise HTTPException(status_code=422, detail="valor_maximo_item menor que valor_minimo_item")
     profile = await profile_svc.create_profile(
         session,
-        empresa_id=str(user.empresa_id),
+        empresa_id=user.empresa_id,
         nome_perfil=body.nome_perfil,
         ufs_permitidas=[u.strip() for u in body.ufs_permitidas],
         valor_minimo_item=body.valor_minimo_item,
@@ -652,7 +652,7 @@ async def list_interest_profiles(
 ) -> dict[str, Any]:
     items = [
         await profile_svc.load_profile_view(session, p)
-        for p in await profile_svc.list_profiles(session, str(user.empresa_id))
+        for p in await profile_svc.list_profiles(session, user.empresa_id)
     ]
     return {"perfis": items}
 
@@ -790,7 +790,7 @@ async def match_feedback(
     """Relevante → FAVORITO. Irrelevante → DESCARTADO e devolve termos sugeridos para a lista negativa."""
     match = await session.get(MatchItem, match_id)
     owner = await session.get(InterestProfile, match.perfil_id) if match else None
-    if match is None or owner is None or owner.empresa_id != str(user.empresa_id):
+    if match is None or owner is None or owner.empresa_id != user.empresa_id:
         raise HTTPException(status_code=404, detail="Oportunidade não encontrada")
     return await apply_feedback(session, match, relevante=body.relevante)
 

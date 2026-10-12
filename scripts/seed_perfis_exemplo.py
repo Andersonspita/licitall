@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import uuid
 from typing import Any
 
 from sqlmodel import select
@@ -42,16 +43,16 @@ PERFIS: list[dict[str, Any]] = [
 ]
 
 
-async def empresa_do_usuario(email: str) -> str:
+async def empresa_do_usuario(email: str) -> uuid.UUID:
     await init_db()
     async with get_session_factory()() as session:
         user = (await session.exec(select(Usuario).where(Usuario.email == email.strip().lower()))).first()
     if user is None:
         raise SystemExit(f"Não há usuário com o e-mail {email}. Crie a conta antes (tela de cadastro ou scripts.criar_usuario).")
-    return str(user.empresa_id)
+    return user.empresa_id
 
 
-async def seed(empresa_id: str, ufs: list[str]) -> list[str]:
+async def seed(empresa_id: uuid.UUID, ufs: list[str]) -> list[str]:
     await init_db()
     log: list[str] = []
     async with get_session_factory()() as session:
@@ -68,7 +69,7 @@ async def seed(empresa_id: str, ufs: list[str]) -> list[str]:
     return log
 
 
-async def remove(empresa_id: str) -> list[str]:
+async def remove(empresa_id: uuid.UUID) -> list[str]:
     nomes = {c["nome_perfil"] for c in PERFIS}
     log: list[str] = []
     async with get_session_factory()() as session:

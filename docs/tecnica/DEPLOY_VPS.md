@@ -42,7 +42,8 @@ Confirme Postgres healthy e Evolution em `8080`.
 ```bash
 python3.11 -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
+pip install -r requirements.txt -c requirements.lock
+python -m src.db.migrate
 # Docling é pesado; na VPS pode instalar sob demanda na Fase 2
 uvicorn src.main:app --host 0.0.0.0 --port 8000
 ```

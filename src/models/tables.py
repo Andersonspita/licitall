@@ -74,7 +74,7 @@ class InterestProfile(SQLModel, table=True):
     __tablename__ = "perfis_interesse"
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    empresa_id: str = Field(index=True, max_length=64)
+    empresa_id: uuid.UUID = Field(foreign_key="empresas.id", index=True, ondelete="CASCADE")
     nome_perfil: str = Field(max_length=100)
     ufs_permitidas: list[str] = Field(
         default_factory=list, sa_column=Column(ARRAY(String(2)), nullable=False)

@@ -22,12 +22,15 @@ copy .env.example .env
 docker compose up -d
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
+pip install -r requirements.txt -c requirements.lock
+python -m src.db.migrate
 uvicorn src.main:app --reload --port 8000
 python scripts/smoke_local.py --api http://127.0.0.1:8000
 python scripts/smoke_compose.py --api http://127.0.0.1:8000
 ```
 
+- **Versões:** `requirements.txt` declara as dependências; `requirements.lock` fixa todas as versões (inclusive indiretas) e é o que a CI e a imagem instalam. Para atualizar: `sh scripts/atualizar_lock.sh [--upgrade]` e rodar os testes.
+- **Depois de atualizar o código:** `python -m src.db.migrate` (o `create_all` do modo de desenvolvimento cria tabelas novas, mas não altera colunas existentes)
 - API: http://localhost:8000/health  
 - **Produção (HTTPS, migrações, backup):** `docs/usuario/OPERACAO_DOCKER.md` seção 9 · `docker compose --profile app up -d --build`
 - **UI:** http://localhost:8000/ui/login.html — crie a conta da empresa em `/ui/cadastro.html` (ou `python -m scripts.criar_usuario`); operadores via `ADMIN_EMAILS`
