@@ -11,10 +11,11 @@ WORKDIR /app
 
 # Docling (OCR) é opcional e pesado (puxa torch, GBs). Sem ele o parser usa o texto do PDF (pypdfium2).
 # Para incluir: docker compose build --build-arg INSTALL_DOCLING=true api
+# requirements.lock fixa todas as versões (inclusive indiretas): a imagem não muda sozinha com uma biblioteca nova.
 ARG INSTALL_DOCLING=false
-COPY requirements.txt .
-RUN if [ "$INSTALL_DOCLING" = "true" ]; then pip install -r requirements.txt; \
-    else grep -viE '^docling' requirements.txt > /tmp/requirements.txt && pip install -r /tmp/requirements.txt; fi
+COPY requirements.txt requirements.lock ./
+RUN if [ "$INSTALL_DOCLING" = "true" ]; then pip install -r requirements.txt -c requirements.lock; \
+    else grep -viE '^docling' requirements.txt > /tmp/requirements.txt && pip install -r /tmp/requirements.txt -c requirements.lock; fi
 
 COPY alembic.ini ./
 COPY migrations ./migrations
