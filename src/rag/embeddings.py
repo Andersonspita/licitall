@@ -12,7 +12,20 @@ from src.config import get_settings
 
 GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:batchEmbedContents"
 GEMINI_LOTE = 100  # limite da API por requisição
-GEMINI_TENTATIVAS = 4
+GEMINI_TENTATIVAS = 5
+GEMINI_ESPERA_MAX = 70  # s; a cota gratuita (100 textos/min) se renova em até 1 minuto
+
+
+def _retry_delay(r: httpx.Response) -> float:
+    """Segundos pedidos pela API em `error.details[].retryDelay` (ex.: "21s"); 0 se ausente."""
+    try:
+        for d in r.json()["error"].get("details", []):
+            m = re.fullmatch(r"(\d+(?:\.\d+)?)s", str(d.get("retryDelay", "")))
+            if m:
+                return float(m.group(1)) + 1
+    except (ValueError, KeyError, AttributeError):
+        pass
+    return 0.0
 
 
 class EmbeddingError(RuntimeError):
@@ -104,8 +117,9 @@ class EmbeddingProvider:
 
     @staticmethod
     async def _post_gemini(http: httpx.AsyncClient, url: str, corpo: dict) -> dict:
-        # Plano gratuito tem cota por minuto: 429/5xx são tentados de novo com espera crescente.
+        # Plano gratuito tem cota por minuto: 429/5xx são tentados de novo, respeitando o `retryDelay` informado pela API.
         for tentativa in range(1, GEMINI_TENTATIVAS + 1):
+            espera = 2**tentativa
             try:
                 r = await http.post(url, json=corpo)
             except httpx.HTTPError as exc:
@@ -116,7 +130,8 @@ class EmbeddingProvider:
                     return r.json()
                 if r.status_code not in (429, 500, 502, 503, 504) or tentativa == GEMINI_TENTATIVAS:
                     raise EmbeddingError(f"Gemini respondeu {r.status_code}: {r.text[:200]}")
-            await asyncio.sleep(2**tentativa)
+                espera = max(espera, _retry_delay(r))
+            await asyncio.sleep(min(espera, GEMINI_ESPERA_MAX))
         raise EmbeddingError("Gemini indisponível.")  # inalcançável; satisfaz o tipo
 
     @staticmethod

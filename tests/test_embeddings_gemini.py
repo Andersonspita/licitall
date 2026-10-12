@@ -85,6 +85,22 @@ async def test_gemini_repete_em_429_e_depois_funciona(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_gemini_respeita_o_retry_delay_da_api(monkeypatch):
+    _config(monkeypatch, GEMINI_API_KEY="k")
+    cota = {"error": {"code": 429, "details": [{"retryDelay": "21s"}]}}
+    respostas = [httpx.Response(429, json=cota), httpx.Response(200, json={"embeddings": [{"values": [1.0]}]})]
+    _simular(monkeypatch, lambda req: respostas.pop(0))
+    esperas = []
+
+    async def anota(s):
+        esperas.append(s)
+
+    monkeypatch.setattr(emb.asyncio, "sleep", anota)
+    await EmbeddingProvider(dimensions=1).embed(["a"])
+    assert esperas == [22.0]  # 21 s pedidos + 1 s de folga (e não os 2 s do recuo padrão)
+
+
+@pytest.mark.asyncio
 async def test_gemini_erros_viram_embedding_error(monkeypatch):
     _config(monkeypatch, GEMINI_API_KEY="k")
     _simular(monkeypatch, lambda req: httpx.Response(400, text="chave inválida"))
