@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import time
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from datetime import date, datetime
@@ -21,6 +22,20 @@ _ID_PNCP_RE = re.compile(r"^(\d{14})-1-(\d+)/(\d{4})$")
 
 class PncpError(RuntimeError):
     """Falha ao consultar ou baixar recursos do PNCP."""
+
+
+# Depois de uma falha da API de escrita do PNCP, não insiste por este tempo (cada tentativa custa o timeout inteiro).
+CORE_PAUSA_SEGUNDOS = 600.0
+_core_indisponivel_ate = 0.0
+
+
+def normalizar_item_compras(raw: dict[str, Any]) -> dict[str, Any]:
+    """Item da API de dados abertos do Compras.gov.br no formato que `items_from_pncp` entende."""
+    return {
+        **raw,
+        "numeroItem": raw.get("numeroItemPncp") or raw.get("numeroItemCompra"),
+        "descricao": raw.get("descricaoResumida") or raw.get("descricaodetalhada") or "",
+    }
 
 
 def _pncp_retryable(exc: BaseException) -> bool:
@@ -224,6 +239,44 @@ class PncpClient:
         return []
 
     async def get_itens(self, pncp_id: PncpId | str) -> list[dict[str, Any]]:
+        """Itens da contratação: espelho do Compras.gov.br primeiro; API do PNCP se o espelho falhar ou não tiver o edital."""
+        global _core_indisponivel_ate
+        parsed = pncp_id if isinstance(pncp_id, PncpId) else parse_id_pncp(pncp_id)
+        espelho_ok = False
+        try:
+            itens = await self._get_itens_compras(parsed)
+            if itens:
+                return itens
+            espelho_ok = True
+        except (PncpError, httpx.HTTPError):
+            pass
+        if time.monotonic() < _core_indisponivel_ate:
+            if espelho_ok:
+                return []
+            raise PncpError("Itens indisponíveis: espelho do Compras.gov.br falhou e a API do PNCP está em pausa.")
+        try:
+            return await self._get_itens_core(parsed)
+        except (PncpError, httpx.HTTPError):
+            _core_indisponivel_ate = time.monotonic() + CORE_PAUSA_SEGUNDOS
+            if espelho_ok:
+                return []  # o espelho respondeu (sem itens) e a API do PNCP está fora: tratamos como "sem itens por ora"
+            raise
+
+    async def _get_itens_compras(self, parsed: PncpId) -> list[dict[str, Any]]:
+        url = f"{self.settings.compras_dados_abertos_base_url.rstrip('/')}/modulo-contratacoes/2.1_consultarItensContratacoes_PNCP_14133_Id"
+        itens: list[dict[str, Any]] = []
+        pagina = 1
+        while True:
+            payload = await self._get_json(
+                url,
+                {"tipo": "numeroControlePNCPCompra", "codigo": parsed.numero_controle, "pagina": pagina, "tamanhoPagina": 500},
+            )
+            itens.extend(normalizar_item_compras(r) for r in (payload.get("resultado") or []))
+            if not payload.get("paginasRestantes"):
+                return itens
+            pagina += 1
+
+    async def _get_itens_core(self, pncp_id: PncpId | str) -> list[dict[str, Any]]:
         parsed = pncp_id if isinstance(pncp_id, PncpId) else parse_id_pncp(pncp_id)
         url = (
             f"{self.settings.pncp_core_base_url.rstrip('/')}/v1/orgaos/"

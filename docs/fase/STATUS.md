@@ -121,6 +121,10 @@ Tabelas `certidoes` e `atestados` (migração `0002`), por empresa: todos os usu
 
 `EMBEDDING_PROVIDER` = `auto` (padrão: OpenAI se houver `OPENAI_API_KEY`, senão Gemini se houver `GEMINI_API_KEY`, senão hash local), `openai`, `gemini` ou `hash`. `EMBEDDING_BASE_URL` aponta para qualquer endpoint compatível com OpenAI (Ollama, FreeLLMAPI). Gemini: modelo `gemini-embedding-001` (`GEMINI_EMBEDDING_MODEL`), lotes de 100, 512 dimensões normalizadas, repete em 429/5xx. O cache de embeddings separa por provedor e modelo (trocar de provedor recalcula, não mistura). Testado só com respostas simuladas; **falta validar com a chave real**. `tests/conftest.py` zera as chaves nos testes. Limitação: a extração com LLM (`agents/extractor.py`) ainda usa só OpenAI.
 
+## Itens do edital via Compras.gov.br (2026-10-12)
+
+A API de escrita do PNCP (`/api/pncp/v1/orgaos/.../itens` e `/arquivos`) ficou sem responder (timeout) nos testes. `PncpClient.get_itens` agora consulta primeiro o espelho oficial de dados abertos (`dadosabertos.compras.gov.br`, módulo contratações PNCP 14.133, `numeroControlePNCPCompra`) e usa a API do PNCP só se o espelho falhar ou não tiver o edital; após falha do PNCP ele fica 10 min em pausa. **Campos reais confirmados:** `numeroItemPncp`, `descricaoResumida`, `codItemCatalogo` (CATMAT/CATSER; **veio nulo em todos os 10 itens da amostra**, então o casamento por CATMAT só vale quando o órgão informa o catálogo), `materialOuServico`, `quantidade`, `unidadeMedida`, `valorUnitarioEstimado`, `valorTotal`, `tipoBeneficioNome` (ex.: "Participação exclusiva para ME/EPP"). Sem esta conversão o mapeamento antigo descartava todos os itens (esperava `numeroItem`). **Pendente:** os arquivos do edital (`/arquivos`) não têm equivalente nessa API; seguem dependendo da API do PNCP.
+
 ---
 
 ## Próxima ação recomendada

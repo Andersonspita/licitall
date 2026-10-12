@@ -162,7 +162,7 @@ async def download_tender_documents(
 
 
 def _catalog_code(raw: dict[str, Any]) -> int | None:
-    for key in ("codigoItem", "codigoItemCatalogo", "codigoCatalogo", "catalogo"):
+    for key in ("codItemCatalogo", "codigoItem", "codigoItemCatalogo", "codigoCatalogo", "catalogo"):
         value = raw.get(key)
         digits = "".join(ch for ch in str(value or "") if ch.isdigit())
         if digits:

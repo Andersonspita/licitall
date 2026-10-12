@@ -27,6 +27,8 @@ class Settings(BaseSettings):
     pncp_consulta_base_url: str = "https://pncp.gov.br/api/consulta"
     pncp_core_base_url: str = "https://pncp.gov.br/api/pncp"
     pncp_timeout_seconds: float = 35.0
+    # Espelho oficial dos itens do PNCP (Lei 14.133), mais estável que a API de escrita do PNCP.
+    compras_dados_abertos_base_url: str = "https://dadosabertos.compras.gov.br"
     pncp_page_size: int = 50
     pncp_page_retries: int = 4
     reverse_match_enabled: bool = True
