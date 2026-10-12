@@ -5,4 +5,4 @@
 #   sh scripts/atualizar_lock.sh --upgrade  # atualiza tudo para a versão mais nova permitida
 set -e
 cd "$(dirname "$0")/.."
-uv pip compile requirements.txt --python-version 3.12 --universal --no-header -o requirements.lock "$@"
+uv pip compile requirements.txt --python-version 3.11 --universal --no-header -o requirements.lock "$@"
