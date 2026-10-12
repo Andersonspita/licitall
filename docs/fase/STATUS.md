@@ -136,9 +136,15 @@ Evolution API v2.3.7 subida pelo Compose (`redis` + `evolution-api`; o `evolutio
 ## Teste de ponta a ponta com dados reais (2026-10-12) — achados
 
 1. **Espelho Compras.gov.br atrasa semanas:** dos editais publicados em 14/09, 5 de 8 tinham itens; em 28/09, 1 de 8; em outubro, 0 de 8. Editais **abertos** são recentes, então hoje eles ficam sem itens enquanto a API do PNCP (`/itens`) estiver fora do ar; sem itens não há casamento. Os testes usaram editais de 8–14/09 (`only_open=false`).
-2. **Pontuação quase nunca alerta com dados reais (decisão pendente):** o item só é gravado com nota ≥ 40 e só alerta com ≥ 65. O CATMAT (40 pts) vem nulo em quase todos os itens, então o teto sem ele é 35 (léxico) + 25 (semântico) = 60 < 65. O léxico é proporcional (35 × termos achados ÷ termos do perfil): um perfil com 7 produtos e um item que casa com 1 ganha 5 pts. Perfil de alimentos com ~550 itens reais (maioria comida) gravou 0 oportunidades. Opções: reescalar o teto quando o item não tem CATMAT; dar crédito alto à primeira palavra e menos às seguintes; ou manter. **Nada foi alterado.**
+2. **Pontuação quase nunca alertava com dados reais (corrigido, ver seção seguinte):** o item só é gravado com nota ≥ 40 e só alerta com ≥ 65. O CATMAT (40 pts) vem nulo em quase todos os itens, então o teto sem ele é 35 (léxico) + 25 (semântico) = 60 < 65. O léxico é proporcional (35 × termos achados ÷ termos do perfil): um perfil com 7 produtos e um item que casa com 1 ganha 5 pts. Perfil de alimentos com ~550 itens reais (maioria comida) gravou 0 oportunidades. Opções: reescalar o teto quando o item não tem CATMAT; dar crédito alto à primeira palavra e menos às seguintes; ou manter. **Nada foi alterado.**
 3. **Sem falsos alertas:** perfil de papelaria contra os mesmos 553 itens (sem nenhum item de papelaria) gravou 0 — a calibração do Gemini não infla notas.
 4. O servidor de teste usou usuário/perfis "E2E" e 1.458 editais da BA no banco local (limpar quando não forem mais necessários).
+
+---
+
+## Pontuação sem CATMAT e palavras alternativas (2026-10-12)
+
+**Decisão (combinação de duas opções, porque cada uma sozinha gerou 0 alertas na simulação):** (1) léxico: a 1ª palavra do perfil encontrada vale 60% dos 35 pts e cada outra +20% (`credito_lexico` em `src/matching/lexical.py`); (2) sem CATMAT comparável (perfil sem códigos **ou** item sem código) o total é `(léxico + semântico) ÷ 60 × 100` (`final_score(..., catalogo_aplicavel)`). **Resultado nos mesmos 553 itens reais da BA, limiares de produção:** perfil de alimentos 110 itens gravados (≥ 40) e 15 alertas (≥ 65), todos de comida (antes: 0 e 0); perfil de papelaria, sem itens de papelaria na amostra, 0 e 0 (sem falso positivo). Alternativas medidas: "qualquer palavra = léxico cheio" + reescala dava 105 alertas (precisão semelhante, mas sem gradação); só reescalar ou só mudar o léxico dava 0 alertas. **Limites:** os 60%/20% foram ajustados em **um** perfil (alimentos) e ~550 itens de 24 editais; a precisão foi medida por palavras-chave (viés a favor de itens com termos explícitos); a recall estimada é ~40% (limitada às 7 palavras do perfil); revisar com dados e perfis de clientes reais. Trocar o provedor de embeddings muda a parte semântica.
 
 ---
 

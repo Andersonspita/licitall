@@ -12,6 +12,7 @@ from dataclasses import dataclass, field
 from typing import Any, Protocol
 
 from src.matching.hard_filters import normalize_text
+from src.matching.lexical import MAX_LEXICAL
 
 MAX_SEMANTIC = 25.0
 MAX_TEXT_CHARS = 500
@@ -108,6 +109,11 @@ def profile_description(nome: str, obrigatorias: list[str], positivas: list[str]
     return sanitize_item_text(" ".join([nome, *obrigatorias, *positivas]))
 
 
-def final_score(catmat: float, lexico: float, semantico: float) -> dict[str, Any]:
-    total = round(min(catmat + lexico + semantico, 100.0), 2)
+def final_score(catmat: float, lexico: float, semantico: float, catalogo_aplicavel: bool = True) -> dict[str, Any]:
+    """Soma das camadas. Sem CATMAT comparável (perfil sem códigos ou item sem código) a camada de catálogo não pode
+    pontuar nem contar contra o item: o restante (léxico + semântico, máx. 60) é reescalado para 0–100."""
+    if catalogo_aplicavel:
+        total = round(min(catmat + lexico + semantico, 100.0), 2)
+    else:
+        total = round(min((lexico + semantico) / (MAX_LEXICAL + MAX_SEMANTIC) * 100.0, 100.0), 2)
     return {"score_total": total, "alerta": total >= ALERT_THRESHOLD}

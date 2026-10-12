@@ -44,10 +44,10 @@ def test_catmat_respeita_peso_e_codigo_diferente_zera():
     assert score_layer2(item, catalogo={999: 1.0}).score_catmat == 0.0
 
 
-def test_lexico_proporcional_aos_termos_encontrados():
+def test_lexico_trata_palavras_positivas_como_alternativas():
     item = {"descricao": "Notebook corporativo 16GB com monitor"}
     r = score_layer2(item, positivas=["notebook", "monitor", "impressora", "teclado"])
-    assert r.score_lexico == 17.5
+    assert r.score_lexico == 28.0  # 2 de 4 achadas: 60% + 20% = 80% de 35
     assert r.termos_encontrados == ["notebook", "monitor"]
     assert r.candidato
 
@@ -66,7 +66,16 @@ def test_sem_nenhum_sinal_nao_e_candidato():
 
 def test_texto_do_objeto_tambem_conta():
     r = score_layer2({"descricao": "Item 01"}, positivas=["papel"], extra_text="Aquisição de papel A4")
-    assert r.score_lexico == 35.0
+    assert r.score_lexico == 35.0  # perfil de uma só palavra: achada = 100%
+
+
+def test_credito_lexico_curva_e_limites():
+    from src.matching.lexical import credito_lexico
+
+    assert credito_lexico(0, 7) == 0.0 and credito_lexico(1, 0) == 0.0
+    assert credito_lexico(1, 7) == 0.6 and credito_lexico(2, 7) == 0.8
+    assert credito_lexico(3, 7) == 1.0 and credito_lexico(7, 7) == 1.0  # nunca passa de 100%
+    assert credito_lexico(1, 1) == 1.0 and credito_lexico(1, 2) == 0.6 and credito_lexico(2, 2) == 1.0
 
 
 def test_rota_candidates_antes_da_rota_generica():

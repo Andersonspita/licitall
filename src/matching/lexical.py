@@ -17,6 +17,10 @@ from src.matching.hard_filters import normalize_text
 MAX_CATALOG = 40.0
 MAX_LEXICAL = 35.0
 TRIGRAM_THRESHOLD = 0.6
+# As palavras do perfil são alternativas ("papel", "caneta", "toner"): achar uma já indica relevância. A 1ª vale 60% do
+# léxico e cada outra +20% (3 palavras = 100%). Medido em ~550 itens reais (docs/fase/STATUS.md); calibrado num perfil só.
+CREDITO_PRIMEIRO_TERMO = 0.6
+CREDITO_POR_TERMO_EXTRA = 0.2
 
 _COMMON_STOPWORDS = {
     "a", "o", "as", "os", "de", "da", "do", "das", "dos", "em", "no", "na", "nos", "nas",
@@ -77,6 +81,14 @@ def term_present(term: str, tokens: list[str]) -> bool:
     return True
 
 
+def credito_lexico(achados: int, total: int) -> float:
+    """Fração (0–1) do léxico: o maior entre a curva de alternativas e a proporção simples (perfil de 1 palavra = 100%)."""
+    if achados <= 0 or total <= 0:
+        return 0.0
+    curva = CREDITO_PRIMEIRO_TERMO + CREDITO_POR_TERMO_EXTRA * (achados - 1)
+    return min(1.0, max(curva, achados / total))
+
+
 @dataclass
 class Layer2Result:
     score_catmat: float = 0.0
@@ -102,7 +114,7 @@ def score_layer2(
 
     CATMAT: 40 pts se o código for idêntico. A regra de 20 pts para "mesmo grupo/classe" não é
     aplicada porque o projeto não possui a hierarquia do catálogo federal.
-    Léxico: até 35 pts, proporcional aos termos (obrigatórios + positivos) presentes.
+    Léxico: até 35 pts; a 1ª palavra (obrigatória ou positiva) presente vale 60%, cada outra +20% (`credito_lexico`).
     Obrigatória ausente: o item deixa de ser candidato.
     """
     result = Layer2Result()
@@ -119,7 +131,7 @@ def score_layer2(
             result.termos_encontrados.append(term)
     result.obrigatorias_ausentes = [t for t in mandatory if t not in result.termos_encontrados]
     if all_terms:
-        result.score_lexico = round(MAX_LEXICAL * len(result.termos_encontrados) / len(all_terms), 2)
+        result.score_lexico = round(MAX_LEXICAL * credito_lexico(len(result.termos_encontrados), len(all_terms)), 2)
 
     result.candidato = not result.obrigatorias_ausentes and (
         result.score_catmat > 0 or result.score_lexico > 0

@@ -90,3 +90,11 @@ def test_descricao_do_perfil_e_score_final():
     assert final_score(40, 20, 10) == {"score_total": 70.0, "alerta": True}
     assert final_score(0, 20, 10)["alerta"] is False
     assert final_score(40, 35, 25)["score_total"] == 100.0
+
+
+def test_sem_catmat_comparavel_reescala_o_restante_para_100():
+    assert final_score(0, 35, 25, catalogo_aplicavel=False) == {"score_total": 100.0, "alerta": True}
+    assert final_score(0, 21, 9, catalogo_aplicavel=False)["score_total"] == 50.0  # (21+9)/60
+    assert final_score(0, 21, 9, catalogo_aplicavel=False)["alerta"] is False
+    # com catálogo aplicável (perfil com códigos e item com código), código diferente continua contando contra o item
+    assert final_score(0, 21, 9, catalogo_aplicavel=True)["score_total"] == 30.0
