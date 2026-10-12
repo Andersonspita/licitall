@@ -86,18 +86,18 @@ async def main(args: argparse.Namespace) -> None:
     com_cnae = sum(1 for t in editais if t.get("cnaes_compativeis"))
     ops = result.opportunities
     recs = Counter(o.recommendation for o in ops)
-    principal = [o for o in ops if o.factors.cnae >= 35]
-    secundario = sum(1 for o in ops if 0 < o.factors.cnae < 35 and not o.ramo_semantico and o.factors.cnae != 12)
-    semantico = sum(1 for o in ops if (o.ramo_semantico or {}).get("status") == "compativel")
+    ramos = Counter(o.ramo for o in ops)
+    principal = [o for o in ops if o.ramo == "principal"]
+    secundario, semantico = ramos["secundario"], ramos["significado"]
     print(f"\nEditais abertos avaliados: {len(editais)}{f' (UF {args.uf.upper()})' if args.uf else ''}")
     print(f"  com itens no banco: {com_itens} · com CNAE inferido: {com_cnae}")
     print(f"  do ramo da empresa: {len(principal)} pelo CNAE principal · {secundario} só por secundário · {semantico} por significado")
     print(f"  BID: {recs['BID']} · REVIEW: {recs['REVIEW']} · SKIP: {recs['SKIP']}")
 
-    print(f"\nTop {args.top}:")
+    print(f"\nTop {args.top} (ramo principal primeiro, depois secundário/significado, depois desconhecido; dentro do ramo, pela nota):")
     for pos, o in enumerate(ops[: args.top], 1):
         f = o.factors
-        print(f"\n{pos:>2}. [{o.recommendation}] {o.score:.0f} pts — {o.orgao_comprador or '—'} ({o.municipio or '—'}/{o.uf or '—'})")
+        print(f"\n{pos:>2}. [{o.recommendation}] {o.score:.0f} pts · ramo {o.ramo} — {o.orgao_comprador or '—'} ({o.municipio or '—'}/{o.uf or '—'})")
         print(f"    {(o.objeto_resumido or '').strip()[:180]}")
         print(f"    valor {_moeda(o.valor_total_estimado)} · encerra {o.data_encerramento_propostas or '—'} · {o.id_pncp}")
         print(f"    CNAE {f.cnae:.0f} · geo {f.geography:.0f} · porte {f.porte:.0f} · econ {f.economic:.0f} · prazo {f.deadline:.0f}")

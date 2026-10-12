@@ -6,6 +6,7 @@ Expandir conforme catálogo operacional do LicitAll.
 
 from __future__ import annotations
 
+import html
 import re
 import unicodedata
 from typing import Iterable
@@ -56,7 +57,7 @@ _CNAE_RULES: tuple[tuple[tuple[str, ...], ...], ...] = (
 
 
 def _sem_acento(text: str) -> str:
-    base = unicodedata.normalize("NFKD", text.lower())
+    base = unicodedata.normalize("NFKD", html.unescape(text).lower())
     return re.sub(r"\s+", " ", "".join(c for c in base if not unicodedata.combining(c)))
 
 

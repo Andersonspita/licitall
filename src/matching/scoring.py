@@ -45,6 +45,7 @@ class ScoreBreakdown:
     economic: float = 0.0
     deadline: float = 0.0
     total: float = 0.0
+    ramo: str = "desconhecido"  # principal | secundario | significado | desconhecido | incompativel
     explanations: list[str] = field(default_factory=list)
     recommendation: Recommendation = "SKIP"
 
@@ -140,9 +141,17 @@ def score_match(
         economic=economic_pts,
         deadline=deadline_pts,
         total=total,
+        ramo=_tipo_ramo(tender, cnae_pts),
         explanations=explanations,
         recommendation=rec,
     )
+
+
+def _tipo_ramo(tender: dict[str, Any], cnae_pts: float) -> str:
+    if tender.get("cnaes_compativeis"):
+        return {WEIGHT_CNAE: "principal", WEIGHT_CNAE_SECUNDARIO: "secundario"}.get(cnae_pts, "incompativel")
+    status = (tender.get("ramo_semantico") or {}).get("status")
+    return {"compativel": "significado", "incompativel": "incompativel"}.get(status, "desconhecido")
 
 
 def matching_score(

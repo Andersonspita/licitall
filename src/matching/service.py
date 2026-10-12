@@ -75,6 +75,7 @@ class OpportunityMatch(BaseModel):
     eligibility_warnings: list[str] = Field(default_factory=list)
     eligibility_failures: list[str] = Field(default_factory=list)
     ramo_semantico: dict[str, Any] | None = None  # quando o ramo veio da similaridade de significado
+    ramo: str = "desconhecido"  # principal | secundario | significado | desconhecido | incompativel
 
 
 class CompanyOpportunityResult(BaseModel):
@@ -137,6 +138,9 @@ async def _aplicar_ramo_semantico(
             f"Comparação por significado parcial: {len(avaliados)} de {len(sem_ramo)} editais sem ramo comparados; "
             f"o resto fica para revisão ({res.erro}). O que foi calculado ficou no cache: rode de novo depois para completar."
         )
+
+
+ORDEM_RAMO = {"principal": 0, "secundario": 1, "significado": 1, "desconhecido": 2, "incompativel": 3}
 
 
 # Pontuar é barato (Python puro); o teto só protege a memória com bases muito grandes.
@@ -287,6 +291,7 @@ def _build_opportunity_match(
         eligibility_warnings=verdict.soft_warnings,
         eligibility_failures=verdict.hard_failures,
         ramo_semantico=tender.get("ramo_semantico"),
+        ramo=breakdown.ramo,
     )
 
 
@@ -578,7 +583,9 @@ class MatchmakingService:
                 continue
             ranked.append(_build_opportunity_match(tender_view, breakdown, verdict))
 
-        ranked.sort(key=lambda m: m.score, reverse=True)
+        # Do negócio principal da empresa primeiro: uma distribuidora de papelaria quer papel A4 antes de móveis, mesmo
+        # que o edital de móveis valha mais (o fator valor favorece contratos grandes). Dentro do mesmo ramo, pela nota.
+        ranked.sort(key=lambda m: (ORDEM_RAMO.get(m.ramo, 9), -m.score))
         return CompanyOpportunityResult(
             cnpj=digits,
             razao_social=company.get("razao_social"),

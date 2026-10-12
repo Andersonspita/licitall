@@ -7,7 +7,9 @@ SHA-256 do texto. A lógica de cache/lote é pura (opera sobre dicts) para ser t
 from __future__ import annotations
 
 import hashlib
+import html
 import re
+import unicodedata
 from dataclasses import dataclass, field
 from collections.abc import Awaitable, Callable
 from typing import Any, Protocol
@@ -30,7 +32,7 @@ _LEADING_VERB = re.compile(r"^(aquisi[cç][aã]o|contrata[cç][aã]o|forneciment
 
 def sanitize_item_text(text: str | None) -> str:
     """Remove numeração e referências burocráticas, normaliza e limita a ~500 caracteres."""
-    cleaned = _ITEM_PREFIX.sub(" ", str(text or ""))
+    cleaned = _ITEM_PREFIX.sub(" ", unicodedata.normalize("NFC", html.unescape(str(text or ""))))
     cleaned = _NOISE_TO_END.sub(" ", cleaned)
     cleaned = re.sub(r"[,;:()\"]", " ", cleaned)
     cleaned = _LEADING_VERB.sub("", normalize_text(cleaned).lstrip(" -"))

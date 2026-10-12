@@ -333,3 +333,36 @@ def test_locacao_e_outro_ramo_que_venda():
     assert "4754701" not in f("fornecimento de computadores de mesa")  # "mesa" aqui não é móvel
     assert f("Locação de veículos tipo pick-up") == ["7711000", "7719599"]
     assert "4511101" in f("Aquisição de veículos 0 km")
+
+
+def test_objeto_com_acento_em_entidade_html():
+    from src.ingestion.service import map_pncp_item
+    from src.matching.cnae_map import infer_cnaes_from_text
+
+    bruto = "LOCAC&#807;A&#771;O DE IMPRESSORAS MULTIFUNCIONAIS"  # como veio do PNCP (Baixa Grande/BA, out/2026)
+    assert infer_cnaes_from_text(bruto) == ["7733100"]
+    assert map_pncp_item({"objetoCompra": bruto})["objeto_resumido"] == "LOCAÇÃO DE IMPRESSORAS MULTIFUNCIONAIS"
+
+
+@pytest.mark.asyncio
+async def test_ramo_principal_vem_antes_do_secundario_mesmo_com_nota_menor():
+    """Teste real: papel A4 (73 pts) ficava abaixo de móveis (78) para uma distribuidora de papelaria."""
+    from src.matching.service import MatchmakingService
+
+    empresa = {"cnpj": "05195608000132", "razao_social": "PAPELARIA", "uf": "BA", "municipio": "FEIRA DE SANTANA",
+               "porte": "DEMAIS", "cnae_fiscal": 4647801, "cnaes_secundarios": [{"codigo": 4754701, "descricao": "Móveis"}],
+               "situacao_cadastral": 2, "descricao_situacao_cadastral": "ATIVA"}
+    fim = (date.today() + timedelta(days=10)).isoformat()
+    editais = [
+        {"id_pncp": "moveis", "objeto_resumido": "Aquisição de mobiliário escolar", "uf": "BA", "valor_total_estimado": 2_000_000,
+         "data_encerramento_propostas": fim},
+        {"id_pncp": "papel", "objeto_resumido": "AQUISIÇÃO DE PAPEL A4", "uf": "BA", "valor_total_estimado": 20_000,
+         "data_encerramento_propostas": fim},
+        {"id_pncp": "persiana", "objeto_resumido": "Aquisição de persianas", "uf": "BA", "valor_total_estimado": 50_000,
+         "data_encerramento_propostas": fim},
+    ]
+    r = await MatchmakingService().match_company("x", tenders=editais, company=empresa, min_score=0)
+    por_id = {o.id_pncp: o for o in r.opportunities}
+    assert por_id["papel"].score < por_id["moveis"].score  # o valor favorece móveis...
+    assert [o.id_pncp for o in r.opportunities] == ["papel", "moveis", "persiana"]  # ...mas o ramo principal vem antes
+    assert [o.ramo for o in r.opportunities] == ["principal", "secundario", "desconhecido"]
