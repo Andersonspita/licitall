@@ -34,6 +34,8 @@ Marco: Lei 14.133/2021 Art. 4º c/c LC 123/2006 Art. 48.
 
 **Recomendação:** BID ≥ 70 · REVIEW 40–69 · SKIP < 40 (ou hard-fail de elegibilidade).
 
+**Ramo por significado** (`src/matching/ramo_semantico.py`): edital cujo ramo o mapa de palavras-chave não identifica tem o objeto comparado (embeddings, com cache) com a descrição de cada CNAE da empresa. Similaridade ≥ alto → compatível (+28); < baixo → incompatível (SKIP); entre os dois → ramo desconhecido (teto 45, revisar). Limiares por provedor em `LIMIARES_RAMO` (gemini 0,76/0,84, **provisórios**); sem chave de embedding ou sem limiar calibrado, nada muda e a resposta traz um aviso. Calibrar com `scripts/match_empresa_real.py --medir-ramo` e `--limiares`.
+
 Ramo incompatível (CNAE conhecido no edital e na empresa, sem interseção): teto 35, ou seja SKIP. Sem isso, UF + porte + valor + prazo davam até 65 pts a um edital de outro ramo. Edital sem CNAE inferido continua com pontuação parcial (+12) e pode ir para REVIEW.
 
 Demais em lote exclusivo: penalização forte (teto ~35) + hard-fail YAML.

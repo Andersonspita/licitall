@@ -164,12 +164,16 @@ Preparação para testar `POST /matching/company` com uma empresa real. **Corrig
 
 **Segundo teste real (2026-10-12), mesmo escritório, `--sincronizar 7`:** 998 editais abertos da BA gravados (pregão 391, concorrência 55, dispensa 552; dois 429 do PNCP superados com espera). Achados: (1) **0 editais com itens** no banco, e só 344 (34%) com ramo identificado: os demais têm objeto genérico ("Aquisição de bens comuns") e só os itens diriam o ramo; (2) **ramo desconhecido virava BID**: 12 pts parciais de CNAE + UF + porte + valor + prazo = 70; o top 15 do escritório era quase todo compras de saúde, lâmpadas e nobreaks (75 BID, 580 REVIEW). **Corrigido:** edital sem ramo identificado tem teto 45 (`TETO_RAMO_DESCONHECIDO`): fica em REVIEW, nunca BID, sempre abaixo de um edital de ramo compatível; (3) o 1º lugar (laudo técnico do TJ-BA) casou com o ramo jurídico provavelmente por "advocacia"/"advogado" em nome de lugar: a regra agora só aceita expressões de contratação ("assessoria jurídica", "serviços advocatícios", "sociedade de advogados", "representação judicial"...). Só 1 edital de serviço jurídico em 7 dias na BA (e era o falso positivo): advocacia pública costuma ser contratada por inexigibilidade, que o sync não busca. **Conclusão:** o gargalo do match inverso é identificar o ramo de editais genéricos, e isso depende dos **itens** (PNCP `/itens` ou espelho Compras.gov.br, que atrasa semanas).
 
+
+**Ramo por significado (2026-10-12):** a sonda `scripts/sonda_itens.py` confirmou na máquina do operador que **não há itens para editais recentes**: espelho Compras.gov.br HTTP 200 com 0 itens; PNCP `/api/pncp` sem resposta em 30 s; `/pncp-api` 503. Com isso, editais de objeto específico mas fora do mapa (persianas, furadeira, cateter, "materias de escritorio") ficavam todos empatados em "revisar" (655 de 998). **Entregue:** `src/matching/ramo_semantico.py` compara o objeto dos editais sem ramo com a descrição de cada CNAE da empresa (Minha Receita), usando o provedor e o cache de embeddings existentes (`src/matching/embedding_cache.py`, extraído de `profiles.py`). Compatível (+28 de 35), incompatível (SKIP) ou incerto (teto 45). Falha do provedor vira aviso; sem `GEMINI_API_KEY` nada muda. Testes: `tests/test_ramo_semantico.py` (8, inclui cache reaproveitado e provedor quebrado); suíte 208. **Limiares do Gemini (0,76/0,84) são provisórios**, herdados da medição item × perfil; medir objeto × CNAE com `--medir-ramo` antes de confiar. Primeira execução com ~650 objetos leva ~7 min na cota gratuita (100 textos/min); depois vem do cache.
+
 ---
 
 ## Próxima ação recomendada
 
 1. Rodar `python -m scripts.match_empresa_real <CNPJ> --uf <UF> --minha-receita https://minhareceita.org` com uma empresa real e avaliar o top 15 (ampliar `cnae_map.py` com os objetos não reconhecidos)
-2. Repetir a sonda da API de itens do PNCP (`/itens`); se seguir fora, decidir o casamento de editais abertos sem itens
+2. Calibrar os limiares do ramo por significado (`--medir-ramo`) com 2–3 empresas de ramos diferentes
+3. Repetir `scripts/sonda_itens.py` periodicamente; quando o PNCP voltar, buscar itens no sync
 3. Publicação num servidor real; fixar versões das imagens `evolution-api` e `minha-receita`
 
 Script local (sem Docker): `scripts/smoke_local.py` · Doc: `docs/tecnica/SMOKE_LOCAL.md` · Fase 6: `docs/tecnica/FASE6_INTEGRACAO.md`

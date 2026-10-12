@@ -980,7 +980,7 @@ async def matching_for_company(
         result = await service.match_company(
             body.cnpj,
             tenders=body.tenders,
-            session=None if body.tenders is not None else session,
+            session=session,  # com editais inline, a sessão serve só ao cache de embeddings
             limit=body.limit,
             min_score=body.min_score,
             require_proximity=body.require_proximity,
@@ -1146,7 +1146,7 @@ async def outreach_digest_from_company(
         result = await matcher.match_company(
             body.cnpj,
             tenders=body.tenders,
-            session=None if body.tenders is not None else session,
+            session=session,  # com editais inline, a sessão serve só ao cache de embeddings
             limit=body.top_n,
             min_score=body.min_score,
             require_proximity=body.require_proximity,

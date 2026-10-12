@@ -3,6 +3,11 @@
     python -m scripts.match_empresa_real 12345678000199 [--uf BA] [--top 15] [--json saida.json]
     python -m scripts.match_empresa_real 12345678000199 --minha-receita https://minhareceita.org
     python -m scripts.match_empresa_real 12345678000199 --uf BA --sincronizar 7   # busca antes os abertos dos últimos 7 dias
+    python -m scripts.match_empresa_real 12345678000199 --uf BA --medir-ramo      # distribuição da similaridade objeto × CNAE
+    python -m scripts.match_empresa_real 12345678000199 --uf BA --limiares 0.74,0.82
+
+Editais cujo ramo o mapa de palavras-chave não identifica são comparados por significado com os CNAEs da empresa
+(com GEMINI_API_KEY). Na primeira vez são ~1 chamada por 100 objetos (cota gratuita: 100/min); depois vem do cache.
 
 Lê `tender_ingest` (rode o sync antes) e consulta o CNPJ na Minha Receita. Sem a base local
 (ETL), `--minha-receita https://minhareceita.org` usa a API pública, que tem o mesmo formato.
@@ -55,9 +60,11 @@ async def main(args: argparse.Namespace) -> None:
             result = await service.match_company(
                 args.cnpj,
                 tenders=editais,
+                session=session,
                 limit=len(editais) or 1,
                 min_score=0,
                 uf_filter=args.uf,
+                ramo_limiares=args.limiares,
             )
     finally:
         await service.aclose()
@@ -91,14 +98,42 @@ async def main(args: argparse.Namespace) -> None:
         print(f"    {(o.objeto_resumido or '').strip()[:180]}")
         print(f"    valor {_moeda(o.valor_total_estimado)} · encerra {o.data_encerramento_propostas or '—'} · {o.id_pncp}")
         print(f"    CNAE {f.cnae:.0f} · geo {f.geography:.0f} · porte {f.porte:.0f} · econ {f.economic:.0f} · prazo {f.deadline:.0f}")
+        if o.ramo_semantico:
+            r = o.ramo_semantico
+            print(f"    ramo por significado: {r['status']} (similaridade {r['similaridade']:.3f} com \"{r['referencia']}\")")
         for motivo in o.eligibility_failures:
             print(f"    ✗ {motivo}")
+
+    if args.medir_ramo:
+        medir_ramo(ops)
 
     if args.json:
         payload: dict[str, Any] = result.model_dump(mode="json")
         with open(args.json, "w", encoding="utf-8") as fh:
             json.dump(payload, fh, ensure_ascii=False, indent=2)
         print(f"\nResultado completo em {args.json}")
+
+
+def medir_ramo(ops: list[Any]) -> None:
+    """Distribuição da similaridade objeto × CNAE, com exemplos por faixa, para calibrar os limiares."""
+    com = sorted((o for o in ops if o.ramo_semantico), key=lambda o: -o.ramo_semantico["similaridade"])
+    if not com:
+        print("\nNenhum edital comparado por significado (sem GEMINI_API_KEY, ou todos com ramo pelo mapa).")
+        return
+    sims = [o.ramo_semantico["similaridade"] for o in com]
+    print(f"\nSimilaridade objeto × CNAE em {len(com)} editais: máx {sims[0]:.3f} · mediana {sims[len(sims) // 2]:.3f} · mín {sims[-1]:.3f}")
+    faixas: dict[str, list[Any]] = {}
+    for o in com:
+        faixas.setdefault(f"{int(o.ramo_semantico['similaridade'] * 100) / 100:.2f}", []).append(o)
+    for faixa, itens in faixas.items():
+        print(f"  {faixa}: {len(itens):>4} " + "#" * min(60, len(itens)))
+    print("\nOs 15 mais parecidos (confira se são do ramo):")
+    for o in com[:15]:
+        print(f"  {o.ramo_semantico['similaridade']:.3f}  {(o.objeto_resumido or '').strip()[:110]}")
+    meio = len(com) // 2
+    print("\nNo meio da distribuição:")
+    for o in com[max(0, meio - 3): meio + 3]:
+        print(f"  {o.ramo_semantico['similaridade']:.3f}  {(o.objeto_resumido or '').strip()[:110]}")
 
 
 async def sincronizar(uf: str | None, dias: int) -> None:
@@ -157,5 +192,8 @@ if __name__ == "__main__":
     parser.add_argument("--top", type=int, default=15)
     parser.add_argument("--json", help="Grava o resultado completo neste arquivo")
     parser.add_argument("--sincronizar", type=int, metavar="DIAS", help="Antes, busca no PNCP os editais abertos publicados nos últimos DIAS")
+    parser.add_argument("--medir-ramo", action="store_true", help="Mostra a distribuição da similaridade objeto × CNAE")
+    parser.add_argument("--limiares", type=lambda v: tuple(float(x) for x in v.split(",")), metavar="BAIXO,ALTO",
+                        help="Limiares de cosseno do ramo por significado (padrão do provedor; gemini: 0.76,0.84)")
     parser.add_argument("--minha-receita", help="URL da Minha Receita (ex.: https://minhareceita.org)")
     asyncio.run(main(parser.parse_args()))

@@ -74,6 +74,7 @@ class OpportunityMatch(BaseModel):
     eligibility_ok: bool = True
     eligibility_warnings: list[str] = Field(default_factory=list)
     eligibility_failures: list[str] = Field(default_factory=list)
+    ramo_semantico: dict[str, Any] | None = None  # quando o ramo veio da similaridade de significado
 
 
 class CompanyOpportunityResult(BaseModel):
@@ -90,6 +91,46 @@ class CompanyOpportunityResult(BaseModel):
         default_factory=lambda: {"bid": 70.0, "review": REVIEW_THRESHOLD}
     )
     marco_legal: str = f"Lei 14.133/2021 c/c {LC123_REF}"
+
+
+async def _aplicar_ramo_semantico(
+    session: AsyncSession,
+    views: list[dict[str, Any]],
+    company: dict[str, Any],
+    avisos: list[str],
+    embedder: Any | None,
+    limiares: tuple[float, float] | None,
+) -> None:
+    """Marca `ramo_semantico` nos editais sem CNAE inferido. Falha do provedor vira aviso, nunca erro."""
+    from src.matching import ramo_semantico as rs
+    from src.matching.embedding_cache import vectors_with_cache
+
+    sem_ramo = [v for v in views if not v.get("cnaes_compativeis") and rs.texto_objeto(v)]
+    descricoes = rs.descricoes_cnae(company)
+    if not sem_ramo or not descricoes:
+        return
+    if embedder is None:
+        from src.rag.embeddings import EmbeddingProvider
+
+        embedder = EmbeddingProvider(dimensions=512, request_dimensions=True)
+    limiares = limiares or rs.LIMIARES_RAMO.get(embedder.backend)
+    if limiares is None:
+        if embedder.backend == "hash":
+            avisos.append(
+                f"{len(sem_ramo)} editais sem ramo identificado ficaram para revisão: configure GEMINI_API_KEY para "
+                "compará-los por significado com os CNAEs da empresa."
+            )
+        else:
+            avisos.append(f"Provedor {embedder.backend} sem limiares de ramo calibrados: comparação por significado desligada.")
+        return
+    try:
+        res = await vectors_with_cache(session, embedder, descricoes + [rs.texto_objeto(v) for v in sem_ramo])
+    except Exception as exc:  # noqa: BLE001 (cota, rede, chave: o match segue sem a camada semântica)
+        await session.rollback()
+        avisos.append(f"Comparação por significado indisponível ({type(exc).__name__}: {exc}); editais sem ramo ficam para revisão.")
+        return
+    for id_pncp, ramo in rs.avaliar(sem_ramo, descricoes, res.vectors, limiares).items():
+        next(v for v in sem_ramo if v["id_pncp"] == id_pncp)["ramo_semantico"] = ramo.as_dict()
 
 
 # Pontuar é barato (Python puro); o teto só protege a memória com bases muito grandes.
@@ -239,6 +280,7 @@ def _build_opportunity_match(
         eligibility_ok=verdict.eligible,
         eligibility_warnings=verdict.soft_warnings,
         eligibility_failures=verdict.hard_failures,
+        ramo_semantico=tender.get("ramo_semantico"),
     )
 
 
@@ -433,8 +475,14 @@ class MatchmakingService:
         require_proximity: bool = False,
         uf_filter: str | None = None,
         company: dict[str, Any] | None = None,
+        embedder: Any | None = None,
+        ramo_limiares: tuple[float, float] | None = None,
     ) -> CompanyOpportunityResult:
-        """Match inverso: CNPJ/empresa → oportunidades ranqueadas."""
+        """Match inverso: CNPJ/empresa → oportunidades ranqueadas.
+
+        Com `session`, editais cujo ramo o mapa de palavras-chave não identifica são comparados por significado com
+        os CNAEs da empresa (`ramo_semantico`), se o provedor de embeddings tiver limiares calibrados.
+        """
         avisos: list[str] = []
         thresholds = {"bid": 70.0, "review": REVIEW_THRESHOLD}
 
@@ -495,11 +543,17 @@ class MatchmakingService:
                 )
 
         company_cnaes = set(_company_cnae_list(company))
-        ranked: list[OpportunityMatch] = []
+        views: list[dict[str, Any]] = []
         for raw in tenders:
             tender_view = dict(raw)
             tender_view["cnaes_compativeis"] = resolve_cnaes(tender_view)
             tender_view["exclusivo_me_epp"] = resolve_exclusivo_me_epp(tender_view)
+            views.append(tender_view)
+        if session is not None:
+            await _aplicar_ramo_semantico(session, views, company, avisos, embedder, ramo_limiares)
+
+        ranked: list[OpportunityMatch] = []
+        for tender_view in views:
 
             # Atalho: se há CNAEs na empresa e no edital sem interseção, ainda pontua baixo —
             # mas evita ruído extremo quando ambos existem e não cruzam.
