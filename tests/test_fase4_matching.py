@@ -366,3 +366,24 @@ async def test_ramo_principal_vem_antes_do_secundario_mesmo_com_nota_menor():
     assert por_id["papel"].score < por_id["moveis"].score  # o valor favorece móveis...
     assert [o.id_pncp for o in r.opportunities] == ["papel", "moveis", "persiana"]  # ...mas o ramo principal vem antes
     assert [o.ramo for o in r.opportunities] == ["principal", "secundario", "desconhecido"]
+
+
+@pytest.mark.asyncio
+async def test_valor_ate_80_mil_sem_exclusividade_declarada_alerta_e_rebaixa_demais():
+    """LC 123 art. 48, I: até R$ 80 mil é exclusivo ME/EPP (salvo art. 49). Sem itens não se sabe se o edital declarou."""
+    from src.matching.service import MatchmakingService
+
+    fim = (date.today() + timedelta(days=10)).isoformat()
+    edital = {"id_pncp": "a4", "objeto_resumido": "AQUISIÇÃO DE PAPEL A4", "uf": "BA", "valor_total_estimado": 8919.0,
+              "data_encerramento_propostas": fim}
+    base = {"cnpj": "1", "razao_social": "X", "uf": "BA", "cnae_fiscal": 4647801, "situacao_cadastral": 2,
+            "descricao_situacao_cadastral": "ATIVA"}
+    svc = MatchmakingService()
+    demais = (await svc.match_company("1", tenders=[edital], company={**base, "porte": "DEMAIS"}, min_score=0)).opportunities[0]
+    me = (await svc.match_company("1", tenders=[edital], company={**base, "porte": "MICRO EMPRESA"}, min_score=0)).opportunities[0]
+    assert demais.recommendation == "REVIEW" and demais.eligibility_ok  # alerta, não bloqueia: a fonte não informou
+    assert any("Art. 48" in w and "R$ 8.919,00" in w for w in demais.eligibility_warnings)
+    assert me.recommendation == "BID" and not any("Art. 48" in w for w in me.eligibility_warnings)
+    grande = (await svc.match_company("1", tenders=[{**edital, "valor_total_estimado": 300_000}],
+                                      company={**base, "porte": "DEMAIS"}, min_score=0)).opportunities[0]
+    assert not any("Art. 48" in w for w in grande.eligibility_warnings)

@@ -334,6 +334,8 @@ def _rank_pair(
             breakdown.recommendation = "REVIEW"
         else:
             breakdown.recommendation = "SKIP"
+        if verdict.rebaixa_bid and breakdown.recommendation == "BID":
+            breakdown.recommendation = "REVIEW"  # ex.: provável exclusividade ME/EPP não confirmada para porte Demais
     else:
         breakdown.recommendation = "SKIP"
     return breakdown, verdict

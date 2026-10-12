@@ -12,6 +12,11 @@ rules:
   - id: lote_exclusivo_me_epp
     severity: hard
     description: "Lote/item exclusivo ME/EPP (LC 123/2006 Art. 48) exige porte ME ou EPP."
+  - id: faixa_exclusiva_me_epp
+    severity: soft
+    params:
+      rebaixa_bid: true
+    description: "Valor total até R$ 80 mil: pela LC 123/2006 Art. 48, I, a contratação deve ser exclusiva ME/EPP (salvo Art. 49); o edital não informou, confira antes de participar com porte Demais"
   - id: proximidade_obrigatoria
     severity: hard
     description: "Quando require_proximity=true, a empresa deve estar na mesma UF do órgão."

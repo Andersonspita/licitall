@@ -22,7 +22,7 @@ LIMIARES = (0.3, 0.8)
 
 def _edital(n: int, objeto: str) -> dict:
     return {"id_pncp": f"{TAG}-r{n}", "objeto_resumido": objeto, "uf": "BA", "municipio": "SALVADOR",
-            "valor_total_estimado": 50000, "data_encerramento_propostas": (date.today() + timedelta(days=10)).isoformat()}
+            "valor_total_estimado": 150000, "data_encerramento_propostas": (date.today() + timedelta(days=10)).isoformat()}  # acima da faixa LC 123
 
 
 class EmbedderFalso:

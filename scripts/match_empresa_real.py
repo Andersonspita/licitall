@@ -106,6 +106,9 @@ async def main(args: argparse.Namespace) -> None:
             print(f"    ramo por significado: {r['status']} (similaridade {r['similaridade']:.3f} com \"{r['referencia']}\")")
         for motivo in o.eligibility_failures:
             print(f"    ✗ {motivo}")
+        for aviso in o.eligibility_warnings:
+            if "LC 123" in aviso:
+                print(f"    ! {aviso}")
 
     fora = [o for o in principal if o not in ops[: args.top]]
     if fora:
