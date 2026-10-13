@@ -140,13 +140,16 @@ def medir_ramo(ops: list[Any]) -> None:
         faixas.setdefault(f"{int(o.ramo_semantico['similaridade'] * 100) / 100:.2f}", []).append(o)
     for faixa, itens in faixas.items():
         print(f"  {faixa}: {len(itens):>4} " + "#" * min(60, len(itens)))
-    print("\nOs 15 mais parecidos (confira se são do ramo):")
-    for o in com[:15]:
-        print(f"  {o.ramo_semantico['similaridade']:.3f}  {(o.objeto_resumido or '').strip()[:110]}")
-    meio = len(com) // 2
-    print("\nNo meio da distribuição:")
-    for o in com[max(0, meio - 3): meio + 3]:
-        print(f"  {o.ramo_semantico['similaridade']:.3f}  {(o.objeto_resumido or '').strip()[:110]}")
+    print("\nExemplos por faixa (sem repetir objeto; confira quais são do ramo):")
+    for faixa, itens in faixas.items():
+        vistos: list[str] = []
+        for o in itens:
+            obj = " ".join((o.objeto_resumido or "").split())[:90]
+            if obj not in vistos:
+                vistos.append(obj)
+                print(f"  {faixa}  [{o.ramo_semantico['status']}] {obj}  ~ {o.ramo_semantico['referencia'][:40]}")
+            if len(vistos) == 4:
+                break
 
 
 async def sincronizar(uf: str | None, dias: int) -> None:

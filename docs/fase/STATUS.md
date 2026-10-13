@@ -173,6 +173,11 @@ Preparação para testar `POST /matching/company` com uma empresa real. **Corrig
  Rodada seguinte: os 5 editais do ramo principal (papel A4, materiais de escritório) tinham 72–73 pts e ficavam **fora do top 15**, atrás de móveis/uniformes/tablets (78, só CNAE secundário), porque o fator valor favorece contratos grandes. **Agora a lista é ordenada por ramo e depois pela nota** (principal → secundário/significado → desconhecido → incompatível; campo `ramo` em cada oportunidade). Também: o PNCP manda alguns objetos com acentos em entidades HTML decompostas ("LOCAC&#807;A&#771;O"), que escapavam das regras; a ingestão e a comparação agora desfazem as entidades.
  Com a ordem por ramo, os 6 editais de papelaria foram ao topo, mas eram todos pequenos (R$ 2 mil a R$ 61 mil) para empresa de porte **Demais** e apareciam como BID sem alerta. **Compliance:** nova regra `faixa_exclusiva_me_epp` (soft): valor total até R$ 80 mil sem exclusividade declarada → aviso de LC 123 Art. 48, I e BID rebaixado a REVIEW para porte Demais; não torna inelegível (a fonte não informou). Ver `docs/tecnica/COMPLIANCE_14133.md`.
 
+
+## Calibração do ramo por significado (2026-10-13)
+
+Primeira medição real (Gemini, 902 editais abertos da BA, 06–13/10). **Distribuidora de papelaria (24 CNAEs de comércio):** 626 editais comparados; mediana 0,787; acima de 0,83 quase tudo do ramo (livros, papéis, brinquedos, saneantes, material elétrico), **exceto serviços** (luthier 0,87, manutenção de instrumentos 0,86, locação de brinquedos 0,84); de 0,78 a 0,82 mistura (pastas, etiquetas, apostilas junto com lavanderia, odontologia, seguro); abaixo de 0,78 quase nada. **Advocacia (1 CNAE, "Serviços advocatícios"):** nada do ramo até 0,85; o topo era "Serviços de Manutenção" (0,85), puxado pela palavra "Serviços". **Decisão:** limiares gemini (0,78; 0,86), precisão primeiro; empresa só de comércio (CNAE 45–47) não casa objeto de serviço/locação/seguro como compatível (fica incerto). `--medir-ramo` mostra exemplos por faixa sem repetição. **Próximo passo possível:** tirar palavras genéricas ("Serviços", "Comércio varejista de", "Contratação de empresa especializada") dos dois textos antes de comparar, o que deve separar melhor a faixa de 0,78–0,86; exige remedir (os vetores mudam).
+
 ---
 
 ## Próxima ação recomendada
