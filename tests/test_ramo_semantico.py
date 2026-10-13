@@ -194,3 +194,47 @@ def test_empresa_so_de_comercio_nao_casa_servico_por_significado():
 
 def test_limiares_gemini_medidos():
     assert rs.LIMIARES_RAMO["gemini"] == (0.78, 0.86)
+
+
+def test_texto_limpo_tira_palavras_genericas_dos_dois_lados():
+    o, c = rs.limpar_objeto, rs.limpar_cnae
+    # objetos reais do teste na BA (out/2026)
+    assert o("Contratação de empresa especializada para prestação de serviços advocatícios") == "advocaticios"
+    assert o("[LICITANET] - Registro de Preços para futura e eventual aquisição de material de expediente") == "material de expediente"
+    assert o("Serviços de Manutenção de Assistência Técnica") == "manutencao de assistencia tecnica"
+    assert o("Seleção de proposta apta a gerar o melhor resultado para a contratação de empresa especializada no "
+             "fornecimento de eletrodomésticos") == "eletrodomesticos"
+    assert o("Serviços comuns e serviços comuns de engenharia") == "engenharia"
+    assert o("Serviços") == "servicos"  # não fica vazio
+    assert c("Serviços advocatícios") == "advocaticios"
+    assert c("Comércio varejista de artigos de papelaria") == "artigos de papelaria"
+    assert c("Comércio atacadista de outros equipamentos e artigos de uso pessoal e doméstico não especificados "
+             "anteriormente") == "outros equipamentos e artigos de uso pessoal e domestico"
+
+
+@pytest.mark.asyncio
+async def test_texto_limpo_e_opcional_e_usa_vetores_proprios(ambiente):
+    from src.matching.service import MatchmakingService
+
+    _, dbmod = ambiente
+    # objeto fora do mapa de palavras-chave (senão nem passa pela comparação de significado)
+    editais = [_edital(1, "Contratação de empresa especializada para patrocínio de ações judiciais trabalhistas")]
+    emb = EmbedderFalso()
+    emb.cache_key = f"teste-limpo:{TAG}"  # cache próprio: outros testes já gravaram estes textos
+    service = MatchmakingService()
+    try:
+        async with dbmod.get_session_factory()() as s:
+            await service.match_company("x", tenders=editais, session=s, company=EMPRESA, min_score=0, embedder=emb,
+                                        ramo_limiares=LIMIARES)
+            padrao = list(emb.textos)
+            emb.textos.clear()
+            r = await service.match_company("x", tenders=editais, session=s, company=EMPRESA, min_score=0, embedder=emb,
+                                            ramo_limiares=LIMIARES, texto_limpo=True)
+    finally:
+        await service.aclose()
+        async with dbmod.get_session_factory()() as s:
+            await s.execute(text("delete from embeddings_cache where backend = :b"), {"b": emb.cache_key})
+            await s.commit()
+    assert sorted(padrao) == ["Serviços advocatícios", "empresa especializada para patrocinio de acoes judiciais trabalhistas"]
+    assert sorted(emb.textos) == ["advocaticios", "patrocinio de acoes judiciais trabalhistas"]
+    assert r.opportunities[0].ramo_semantico["referencia"] == "Serviços advocatícios"  # mostra a descrição original

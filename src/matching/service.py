@@ -101,12 +101,13 @@ async def _aplicar_ramo_semantico(
     avisos: list[str],
     embedder: Any | None,
     limiares: tuple[float, float] | None,
+    texto_limpo: bool = False,
 ) -> None:
     """Marca `ramo_semantico` nos editais sem CNAE inferido. Falha do provedor vira aviso, nunca erro."""
     from src.matching import ramo_semantico as rs
     from src.matching.embedding_cache import vectors_with_cache
 
-    sem_ramo = [v for v in views if not v.get("cnaes_compativeis") and rs.texto_objeto(v)]
+    sem_ramo = [v for v in views if not v.get("cnaes_compativeis") and rs.texto_objeto(v, texto_limpo)]
     descricoes = rs.descricoes_cnae(company)
     if not sem_ramo or not descricoes:
         return
@@ -114,7 +115,7 @@ async def _aplicar_ramo_semantico(
         from src.rag.embeddings import EmbeddingProvider
 
         embedder = EmbeddingProvider(dimensions=512, request_dimensions=True)
-    limiares = limiares or rs.LIMIARES_RAMO.get(embedder.backend)
+    limiares = limiares or (rs.LIMIARES_RAMO_LIMPO if texto_limpo else rs.LIMIARES_RAMO).get(embedder.backend)
     if limiares is None:
         if embedder.backend == "hash":
             avisos.append(
@@ -125,13 +126,15 @@ async def _aplicar_ramo_semantico(
             avisos.append(f"Provedor {embedder.backend} sem limiares de ramo calibrados: comparação por significado desligada.")
         return
     try:
-        res = await vectors_with_cache(session, embedder, descricoes + [rs.texto_objeto(v) for v in sem_ramo], parcial=True)
+        textos = [rs.texto_cnae(d, texto_limpo) for d in descricoes] + [rs.texto_objeto(v, texto_limpo) for v in sem_ramo]
+        res = await vectors_with_cache(session, embedder, textos, parcial=True)
     except Exception as exc:  # noqa: BLE001 (banco/cache; o provedor já é tratado no modo parcial)
         await session.rollback()
         avisos.append(f"Comparação por significado indisponível ({exc}); editais sem ramo ficam para revisão.")
         return
     avaliados = rs.avaliar(
-        sem_ramo, descricoes, res.vectors, limiares, empresa_so_comercio=rs.so_comercio(_company_cnae_list(company))
+        sem_ramo, descricoes, res.vectors, limiares,
+        empresa_so_comercio=rs.so_comercio(_company_cnae_list(company)), limpo=texto_limpo,
     )
     for id_pncp, ramo in avaliados.items():
         next(v for v in sem_ramo if v["id_pncp"] == id_pncp)["ramo_semantico"] = ramo.as_dict()
@@ -492,6 +495,7 @@ class MatchmakingService:
         company: dict[str, Any] | None = None,
         embedder: Any | None = None,
         ramo_limiares: tuple[float, float] | None = None,
+        texto_limpo: bool = False,
     ) -> CompanyOpportunityResult:
         """Match inverso: CNPJ/empresa → oportunidades ranqueadas.
 
@@ -565,7 +569,7 @@ class MatchmakingService:
             tender_view["exclusivo_me_epp"] = resolve_exclusivo_me_epp(tender_view)
             views.append(tender_view)
         if session is not None:
-            await _aplicar_ramo_semantico(session, views, company, avisos, embedder, ramo_limiares)
+            await _aplicar_ramo_semantico(session, views, company, avisos, embedder, ramo_limiares, texto_limpo)
 
         ranked: list[OpportunityMatch] = []
         for tender_view in views:
