@@ -5,6 +5,7 @@
     python -m scripts.match_empresa_real 12345678000199 --uf BA --sincronizar 7   # busca antes os abertos dos últimos 7 dias
     python -m scripts.match_empresa_real 12345678000199 --uf BA --medir-ramo      # distribuição da similaridade objeto × CNAE
     python -m scripts.match_empresa_real 12345678000199 --uf BA --limiares 0.74,0.82
+    python -m scripts.match_empresa_real 12345678000199 --uf BA --medir-ramo --texto-limpo   # em medição
 
 Editais cujo ramo o mapa de palavras-chave não identifica são comparados por significado com os CNAEs da empresa
 (com GEMINI_API_KEY). Na primeira vez são ~1 chamada por 100 objetos (cota gratuita: 100/min); depois vem do cache.
@@ -65,6 +66,7 @@ async def main(args: argparse.Namespace) -> None:
                 min_score=0,
                 uf_filter=args.uf,
                 ramo_limiares=args.limiares,
+                texto_limpo=args.texto_limpo,
             )
     finally:
         await service.aclose()
@@ -211,5 +213,8 @@ if __name__ == "__main__":
     parser.add_argument("--medir-ramo", action="store_true", help="Mostra a distribuição da similaridade objeto × CNAE")
     parser.add_argument("--limiares", type=lambda v: tuple(float(x) for x in v.split(",")), metavar="BAIXO,ALTO",
                         help="Limiares de cosseno do ramo por significado (padrão do provedor; gemini: 0.76,0.84)")
+    parser.add_argument("--texto-limpo", action="store_true",
+                        help="Em medição: compara sem palavras genéricas (\"Serviços\", \"Comércio varejista de\"...); "
+                             "recalcula os vetores na 1ª vez")
     parser.add_argument("--minha-receita", help="URL da Minha Receita (ex.: https://minhareceita.org)")
     asyncio.run(main(parser.parse_args()))

@@ -28,6 +28,8 @@ from src.matching.semantic import content_hash, cosine, sanitize_item_text
 #   puxado pela palavra "Serviços" em comum.
 # Corte que serve às duas: compatível a partir de 0,86 (precisão primeiro; os acertos de 0,83–0,85 ficam em revisar).
 LIMIARES_RAMO: dict[str, tuple[float, float]] = {"gemini": (0.78, 0.86)}
+# Com texto limpo os vetores mudam e a distribuição também: NÃO MEDIDO ainda (valores provisórios, só para rodar a medição).
+LIMIARES_RAMO_LIMPO: dict[str, tuple[float, float]] = {"gemini": (0.78, 0.86)}
 
 # Empresa só de comércio (CNAE divisões 45–47) não presta serviço: o significado aproxima "serviço de luthier" de
 # "comércio de instrumentos musicais", "locação de brinquedos" de "comércio de brinquedos".
@@ -42,6 +44,50 @@ class RamoSemantico:
 
     def as_dict(self) -> dict[str, Any]:
         return {"status": self.status, "similaridade": round(self.similaridade, 3), "referencia": self.referencia}
+
+
+# Texto limpo (opção `texto_limpo`, em medição): sem as palavras genéricas que dominavam a similaridade no teste real
+# ("Serviços" aproximava "Serviços advocatícios" de qualquer contratação de serviço; "Comércio varejista de" diluía o
+# CNAE e itens curtos como "colchete para encadernação" pontuavam baixo contra papelaria).
+_PREFIXOS_OBJETO = [re.compile(p) for p in (
+    r"^\[[^\]]*\]\s*-?\s*",  # [LICITANET] - , [Portal de Compras Públicas] -
+    r"^(o presente termo de referencia tem por objeto|a presente demanda tem por objeto|objeto:?)\s+",
+    r"^selecao de proposta apta a gerar o melhor resultado para\s+",
+    r"^registro de precos?\s+(para|visando)\s+",
+    r"^(a|o|e|eventual|futura|parcelada|de forma parcelada)\s+",
+    r"^(aquisicao|contratacao|fornecimento|prestacao|confeccao e fornecimento)(\s+(de|da|do|dos|das))?\s+",
+    r"^(empresas?|pessoa juridica|instituicao)(\s+especializadas?)?(\s+(para|em|no|na|nos|nas|do|da))?\s+",
+    r"^servicos?(\s+(comuns|continuos|nao continuados|tecnicos|especializados|integrados))*(\s+(de|em|para))?\s+",
+)]
+_PREFIXOS_CNAE = [re.compile(p) for p in (
+    r"^comercio\s+(varejista|atacadista)(\s+especializado)?(\s+(de|em))?\s+",
+    r"^(servicos?|atividades?)(\s+de)?\s+",
+    r"^(fabricacao|confeccao)\s+de\s+",
+)]
+_SUFIXO_CNAE = re.compile(r",?\s+(exceto|nao especificad|e outros nao).*$")
+
+
+def _sem_prefixos(texto: str, prefixos: list[re.Pattern[str]]) -> str:
+    anterior = None
+    while texto and texto != anterior:
+        anterior = texto
+        for p in prefixos:
+            texto = p.sub("", texto, count=1).strip(" -:,.")
+    return texto
+
+
+def limpar_objeto(objeto: str) -> str:
+    base = sanitize_item_text(objeto)
+    return _sem_prefixos(base, _PREFIXOS_OBJETO) or base
+
+
+def limpar_cnae(descricao: str) -> str:
+    base = _sem_acento(descricao).strip()
+    return _SUFIXO_CNAE.sub("", _sem_prefixos(base, _PREFIXOS_CNAE)) or base
+
+
+def texto_cnae(descricao: str, limpo: bool = False) -> str:
+    return limpar_cnae(descricao) if limpo else descricao
 
 
 def descricoes_cnae(company: dict[str, Any]) -> list[str]:
@@ -78,8 +124,9 @@ def classificar(similaridade: float, limiares: tuple[float, float]) -> str:
     return "incerto"
 
 
-def texto_objeto(tender: dict[str, Any]) -> str:
-    return sanitize_item_text(tender.get("objeto_resumido"))
+def texto_objeto(tender: dict[str, Any], limpo: bool = False) -> str:
+    objeto = tender.get("objeto_resumido")
+    return limpar_objeto(objeto) if limpo else sanitize_item_text(objeto)
 
 
 def avaliar(
@@ -89,12 +136,13 @@ def avaliar(
     limiares: tuple[float, float],
     *,
     empresa_so_comercio: bool = False,
+    limpo: bool = False,
 ) -> dict[str, RamoSemantico]:
     """id_pncp → ramo por significado, para os editais sem CNAE inferido. Puro (vetores já resolvidos).
 
     Com `empresa_so_comercio`, objeto de serviço/locação/seguro nunca sai "compativel" (fica "incerto").
     """
-    refs = [(d, vetores.get(content_hash(d))) for d in descricoes]
+    refs = [(d, vetores.get(content_hash(texto_cnae(d, limpo)))) for d in descricoes]
     refs = [(d, v) for d, v in refs if v]
     out: dict[str, RamoSemantico] = {}
     if not refs:
@@ -102,7 +150,7 @@ def avaliar(
     for t in tenders:
         if t.get("cnaes_compativeis"):
             continue
-        vec = vetores.get(content_hash(texto_objeto(t)))
+        vec = vetores.get(content_hash(texto_objeto(t, limpo)))
         if not vec:
             continue
         sim, ref = max((cosine(vec, v), d) for d, v in refs)
