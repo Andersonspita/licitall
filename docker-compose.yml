@@ -137,8 +137,14 @@ services:
       EVOLUTION_API_URL: http://evolution-api:8080
       EVOLUTION_API_KEY: ${EVOLUTION_API_KEY:-licitall-dev-evolution-key}
       EVOLUTION_INSTANCE: ${EVOLUTION_INSTANCE:-licitall}
-      MINHA_RECEITA_BASE_URL: http://minha-receita:8000
+      # Padrão: serviço local (perfil "full", exige ETL). Sem ele, use a API pública: https://minhareceita.org
+      MINHA_RECEITA_BASE_URL: ${MINHA_RECEITA_PROD_URL:-http://minha-receita:8000}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      # Embeddings do casamento semântico e do ramo por significado (sem chave: modo local "hash", não semântico)
+      EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-auto}
+      EMBEDDING_BASE_URL: ${EMBEDDING_BASE_URL:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_EMBEDDING_MODEL: ${GEMINI_EMBEDDING_MODEL:-gemini-embedding-001}
       ADMIN_EMAILS: ${ADMIN_EMAILS:-}
       AUTH_REGISTRATION_OPEN: ${AUTH_REGISTRATION_OPEN:-true}
       COOKIE_SECURE: ${COOKIE_SECURE:-true}
