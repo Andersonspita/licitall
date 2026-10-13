@@ -103,7 +103,8 @@ async def main(args: argparse.Namespace) -> None:
         print(f"    CNAE {f.cnae:.0f} · geo {f.geography:.0f} · porte {f.porte:.0f} · econ {f.economic:.0f} · prazo {f.deadline:.0f}")
         if o.ramo_semantico:
             r = o.ramo_semantico
-            print(f"    ramo por significado: {r['status']} (similaridade {r['similaridade']:.3f} com \"{r['referencia']}\")")
+            ressalva = f", {r['ressalva']}" if r.get("ressalva") else ""
+            print(f"    ramo por significado: {r['status']}{ressalva} (similaridade {r['similaridade']:.3f} com \"{r['referencia']}\")")
         for motivo in o.eligibility_failures:
             print(f"    ✗ {motivo}")
         for aviso in o.eligibility_warnings:
@@ -147,7 +148,9 @@ def medir_ramo(ops: list[Any]) -> None:
             obj = " ".join((o.objeto_resumido or "").split())[:90]
             if obj not in vistos:
                 vistos.append(obj)
-                print(f"  {faixa}  [{o.ramo_semantico['status']}] {obj}  ~ {o.ramo_semantico['referencia'][:40]}")
+                r = o.ramo_semantico
+                ressalva = f" ({r['ressalva']})" if r.get("ressalva") else ""
+                print(f"  {faixa}  [{r['status']}{ressalva}] {obj}  ~ {r['referencia'][:40]}")
             if len(vistos) == 4:
                 break
 

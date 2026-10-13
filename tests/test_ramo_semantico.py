@@ -194,3 +194,39 @@ def test_empresa_so_de_comercio_nao_casa_servico_por_significado():
 
 def test_limiares_gemini_medidos():
     assert rs.LIMIARES_RAMO["gemini"] == (0.78, 0.86)
+
+
+def test_objeto_generico_nao_casa_por_significado():
+    """Teste real (BA): objetos sem palavra de ramo ficaram de 0,82 a 0,86 tanto da papelaria quanto da advocacia."""
+    genericos = ["Serviços de Manutenção de Assistência Técnica", "Serviços de Instalações e Montagens",
+                 "AQUISIÇÃO PARA DETERMINAÇÃO JUDICIAL", "Aquisições de materiais de consumo",
+                 "Serviços comuns e serviços comuns de engenharia", "[LICITANET] - Material de Manutenção"]
+    do_ramo = ["Aquisição de Livros", "Apostilas", "AQUISIÇÃO DE MATERIAL ELÉTRICO.", "SABONETE LIQUÍDO",
+               "[LICITANET] - AQUISIÇÃO DE TABLET", "Contratação de empresa especializada em serviços de LUTHIER"]
+    assert all(rs.e_generico(o) for o in genericos)
+    assert not any(rs.e_generico(o) for o in do_ramo)
+
+    descr = ["Serviços advocatícios"]
+    vet = {content_hash(descr[0]): [1.0, 0.0]}
+    editais = [_edital(i, o) for i, o in enumerate(genericos + ["Patrocínio de ações trabalhistas"])]
+    for e in editais:
+        vet[content_hash(rs.texto_objeto(e))] = [0.95, 0.31]
+    out = rs.avaliar(editais, descr, vet, (0.78, 0.86))
+    assert [out[e["id_pncp"]].status for e in editais] == ["incerto"] * len(genericos) + ["compativel"]
+    assert out[editais[0]["id_pncp"]].as_dict()["ressalva"] == "objeto genérico"
+    assert "ressalva" not in out[editais[-1]["id_pncp"]].as_dict()
+
+
+def test_empresa_so_de_servico_nao_casa_compra_por_significado():
+    """O inverso de serviço × comércio: advocacia não vende mercadoria."""
+    descr = ["Serviços advocatícios"]
+    vet = {content_hash(descr[0]): [1.0, 0.0]}
+    editais = [_edital(1, "Aquisição de livros jurídicos"), _edital(2, "Assessoria jurídica em licitações"),
+               _edital(3, "Fornecimento de insumos e prestação de serviços de consultoria jurídica")]
+    for e in editais:
+        vet[content_hash(rs.texto_objeto(e))] = [0.95, 0.31]
+    out = rs.avaliar(editais, descr, vet, (0.78, 0.86), empresa_so_servico=True)
+    assert [out[e["id_pncp"]].status for e in editais] == ["incerto", "compativel", "compativel"]
+    assert out[editais[0]["id_pncp"]].ressalva == "compra; empresa só de serviços"
+    assert rs.so_servico(["6911701", "8211300"]) and not rs.so_servico(["6911701", "4761001"]) and not rs.so_servico([])
+    assert rs.e_compra("AQUISIÇÃO DE MATERIAL ELÉTRICO") and not rs.e_compra("Fornecimento de insumos e prestação de serviços")

@@ -130,8 +130,10 @@ async def _aplicar_ramo_semantico(
         await session.rollback()
         avisos.append(f"Comparação por significado indisponível ({exc}); editais sem ramo ficam para revisão.")
         return
+    cnaes = _company_cnae_list(company)
     avaliados = rs.avaliar(
-        sem_ramo, descricoes, res.vectors, limiares, empresa_so_comercio=rs.so_comercio(_company_cnae_list(company))
+        sem_ramo, descricoes, res.vectors, limiares,
+        empresa_so_comercio=rs.so_comercio(cnaes), empresa_so_servico=rs.so_servico(cnaes),
     )
     for id_pncp, ramo in avaliados.items():
         next(v for v in sem_ramo if v["id_pncp"] == id_pncp)["ramo_semantico"] = ramo.as_dict()

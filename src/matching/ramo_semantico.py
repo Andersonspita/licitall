@@ -5,6 +5,8 @@ Compara o objeto do edital com a descrição de cada CNAE da empresa (Minha Rece
 - similaridade >= alto  → "compativel"   (pontua quase como CNAE compatível)
 - similaridade <  baixo → "incompativel" (vai para SKIP, como CNAE sem interseção)
 - entre os dois         → "incerto"      (continua para revisão manual, teto de ramo desconhecido)
+Objeto genérico, serviço para empresa só de comércio e compra para empresa só de serviços nunca saem "compativel"
+(ficam "incerto", com `ressalva`): o significado sozinho aproxima demais esses casos.
 
 Limiares por provedor, em cosseno bruto. Só há limiar para provedor com calibração medida; sem ele (ou com o
 `hash` local, que não é semântico) nada muda. Os de `gemini` são PROVISÓRIOS: vieram da medição item × perfil
@@ -33,15 +35,41 @@ LIMIARES_RAMO: dict[str, tuple[float, float]] = {"gemini": (0.78, 0.86)}
 # "comércio de instrumentos musicais", "locação de brinquedos" de "comércio de brinquedos".
 _SERVICO = re.compile(r"(?<![a-z])(servicos?|locacao|aluguel|seguros?)(?![a-z])")
 
+# O inverso: empresa só de serviços (CNAE divisões 49–99) não vende mercadoria. "Aquisição para determinação judicial"
+# e "Aquisição de material elétrico" ficaram a 0,82 e 0,79 de "Serviços advocatícios".
+_COMPRA = re.compile(r"(?<![a-z])(aquisi(cao|coes)|compras?|fornecimento|materia(l|is))(?![a-z])")
+
+# Palavras que todo objeto de licitação carrega e não dizem o ramo. Objeto feito só delas ("Aquisições de materiais de
+# consumo", "Serviços de Instalações e Montagens", "Serviços de Manutenção de Assistência Técnica", "Aquisição para
+# determinação judicial") fica perto de qualquer CNAE: medido de 0,82 a 0,86 tanto com a papelaria quanto com a
+# advocacia. Sem palavra de ramo, o significado não decide "compativel".
+_GENERICAS = frozenset(
+    """
+    a o as os ao aos e ou de da do das dos em na no nas nos para pra por pelo pela com sem sob sua seu suas seus que
+    se um uma uns umas tipo conforme demais mais
+    aquisicao aquisicoes compra compras contratacao contratar empresa empresas especializada especializadas pessoa
+    juridica prestacao prestar servico servicos fornecimento fornecer execucao executar material materiais
+    consumo permanente insumos itens item diversos diversas outros outras geral gerais objeto presente
+    manutencao preventiva corretiva instalacao instalacoes montagem montagens assistencia tecnica tecnicos comuns
+    comum engenharia determinacao judicial demanda demandas atender atendimento necessidade necessidades secretaria
+    secretarias municipal municipais municipio estadual orgaos unidades administrativas eventual futura futuro
+    registro precos preco dispensa eletronica licitacao proposta vantajosa escolha continuados continuado
+    """.split()
+)
+
 
 @dataclass(frozen=True)
 class RamoSemantico:
     status: str  # compativel | incompativel | incerto
     similaridade: float
     referencia: str  # descrição do CNAE da empresa mais parecida
+    ressalva: str | None = None  # por que a similaridade alta não virou "compativel"
 
     def as_dict(self) -> dict[str, Any]:
-        return {"status": self.status, "similaridade": round(self.similaridade, 3), "referencia": self.referencia}
+        out = {"status": self.status, "similaridade": round(self.similaridade, 3), "referencia": self.referencia}
+        if self.ressalva:
+            out["ressalva"] = self.ressalva
+        return out
 
 
 def descricoes_cnae(company: dict[str, Any]) -> list[str]:
@@ -60,8 +88,24 @@ def so_comercio(cnaes: list[str]) -> bool:
     return bool(cnaes) and all(str(c)[:2] in {"45", "46", "47"} for c in cnaes)
 
 
+def so_servico(cnaes: list[str]) -> bool:
+    return bool(cnaes) and all(str(c)[:2].isdigit() and int(str(c)[:2]) >= 49 for c in cnaes)
+
+
 def e_servico(objeto: str) -> bool:
     return bool(_SERVICO.search(_sem_acento(objeto)))
+
+
+def e_compra(objeto: str) -> bool:
+    """Compra de mercadoria sem serviço junto ("fornecimento de insumos e prestação de serviços" não conta)."""
+    texto = _sem_acento(objeto)
+    return bool(_COMPRA.search(texto)) and not _SERVICO.search(texto)
+
+
+def e_generico(objeto: str) -> bool:
+    """Objeto sem nenhuma palavra que diga o ramo (só "aquisição", "serviços", "materiais de consumo" e afins)."""
+    texto = re.sub(r"\[[^\]]*\]", " ", _sem_acento(objeto))  # "[LICITANET] - ..." é o portal, não o objeto
+    return not any(p not in _GENERICAS for p in re.findall(r"[a-z]{2,}", texto))
 
 
 def _sem_acento(text: str) -> str:
@@ -89,10 +133,13 @@ def avaliar(
     limiares: tuple[float, float],
     *,
     empresa_so_comercio: bool = False,
+    empresa_so_servico: bool = False,
 ) -> dict[str, RamoSemantico]:
     """id_pncp → ramo por significado, para os editais sem CNAE inferido. Puro (vetores já resolvidos).
 
-    Com `empresa_so_comercio`, objeto de serviço/locação/seguro nunca sai "compativel" (fica "incerto").
+    Similaridade alta não vira "compativel" (fica "incerto", com `ressalva`) quando o objeto é genérico, quando a
+    empresa é só de comércio e o objeto é serviço/locação/seguro, ou quando a empresa é só de serviços e o objeto é
+    compra de mercadoria.
     """
     refs = [(d, vetores.get(content_hash(d))) for d in descricoes]
     refs = [(d, v) for d, v in refs if v]
@@ -106,8 +153,20 @@ def avaliar(
         if not vec:
             continue
         sim, ref = max((cosine(vec, v), d) for d, v in refs)
-        status = classificar(sim, limiares)
-        if status == "compativel" and empresa_so_comercio and e_servico(str(t.get("objeto_resumido") or "")):
-            status = "incerto"
-        out[t["id_pncp"]] = RamoSemantico(status, sim, ref)
+        status, ressalva = classificar(sim, limiares), None
+        if status == "compativel":
+            ressalva = _ressalva(str(t.get("objeto_resumido") or ""), empresa_so_comercio, empresa_so_servico)
+            if ressalva:
+                status = "incerto"
+        out[t["id_pncp"]] = RamoSemantico(status, sim, ref, ressalva)
     return out
+
+
+def _ressalva(objeto: str, so_comercio: bool, so_servico: bool) -> str | None:
+    if e_generico(objeto):
+        return "objeto genérico"
+    if so_comercio and e_servico(objeto):
+        return "serviço; empresa só de comércio"
+    if so_servico and e_compra(objeto):
+        return "compra; empresa só de serviços"
+    return None
