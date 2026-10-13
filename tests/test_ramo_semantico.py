@@ -173,3 +173,24 @@ async def test_falha_no_meio_guarda_o_progresso_no_cache(ambiente):
         async with dbmod.get_session_factory()() as s:
             await s.execute(text("delete from embeddings_cache where backend = :b"), {"b": emb.cache_key})
             await s.commit()
+
+
+def test_empresa_so_de_comercio_nao_casa_servico_por_significado():
+    """Teste real (distribuidora, BA): "serviços de LUTHIER" a 0,87 de "comércio de instrumentos musicais"."""
+    descr = ["Comércio varejista especializado de instrumentos musicais"]
+    vet = {content_hash(descr[0]): [1.0, 0.0]}
+    editais = [_edital(1, "Contratação de empresa especializada em serviços de LUTHIER"),
+               _edital(2, "Aquisição de instrumentos musicais"),
+               _edital(3, "PRESTAÇÃO DE SERVIÇOS DE LOCAÇÃO DE BRINQUEDOS")]
+    for e in editais:
+        vet[content_hash(rs.texto_objeto(e))] = [0.95, 0.31]  # todos "parecidos" pelo significado
+    comercio = rs.avaliar(editais, descr, vet, (0.78, 0.83), empresa_so_comercio=True)
+    assert [comercio[e["id_pncp"]].status for e in editais] == ["incerto", "compativel", "incerto"]
+    servico_ok = rs.avaliar(editais, descr, vet, (0.78, 0.83), empresa_so_comercio=False)
+    assert all(r.status == "compativel" for r in servico_ok.values())
+    assert rs.so_comercio(["4647801", "4789005"]) and not rs.so_comercio(["4647801", "6911701"])
+    assert not rs.e_servico("Material manutencao eletrico hidrossanitario")
+
+
+def test_limiares_gemini_medidos():
+    assert rs.LIMIARES_RAMO["gemini"] == (0.78, 0.86)
