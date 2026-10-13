@@ -1,99 +1,125 @@
 # Deploy na VPS
 
-Guia mínimo para subir o LicitAll em uma VPS Linux (Docker). Ajuste domínio, firewall e secrets antes de produção.
+Sobe tudo em containers: Postgres (pgvector), Redis, Evolution (WhatsApp), a API e o Caddy (HTTPS automático).
+Só as portas 80, 443 e SSH ficam abertas; o resto escuta em `127.0.0.1`. Detalhes de operação e backup:
+`docs/usuario/OPERACAO_DOCKER.md`, seção 9.
 
 ## Pré-requisitos
 
-- Ubuntu 22.04+ (ou similar)
-- Docker Engine + Compose plugin
-- Portas: `80/443` (proxy), e internamente `5432`, `6379`, `8000`, `8001`, `8080` conforme exposição
-- Repositório: `https://github.com/Andersonspita/licitall.git`
+- VPS Ubuntu 22.04 ou 24.04, **2 GB de RAM** ou mais (o build da imagem e o Evolution pesam), 20 GB de disco.
+- Um **domínio** (ou subdomínio) com registro **A** apontando para o IP da VPS. O HTTPS é obrigatório: o cookie de
+  sessão só trafega por ele. Sem domínio próprio, para teste: `DOMAIN=<IP-com-hífens>.sslip.io`
+  (ex.: `203-0-113-10.sslip.io`).
+- Acesso SSH com usuário que tenha `sudo`.
 
-## 1. Clone (somente este repo)
+## 1. Sistema, firewall e Docker
+
+```bash
+sudo apt update && sudo apt -y upgrade
+sudo apt -y install git ufw openssl
+sudo ufw allow OpenSSH && sudo ufw allow 80/tcp && sudo ufw allow 443/tcp && sudo ufw --force enable
+curl -fsSL https://get.docker.com | sudo sh
+sudo usermod -aG docker $USER
+exit   # saia e entre de novo no SSH para o grupo docker valer
+```
+
+Ao voltar: `docker --version && docker compose version`.
+
+## 2. Código
 
 ```bash
 sudo mkdir -p /opt/licitall && sudo chown $USER:$USER /opt/licitall
+git clone https://github.com/Andersonspita/licitall.git /opt/licitall
 cd /opt/licitall
-git clone https://github.com/Andersonspita/licitall.git .
 ```
 
-Não é necessário clonar Docling/LangGraph/etc. na VPS: use PyPI (`requirements.txt`) e imagens Docker do Compose.
+## 3. Arquivo `.env` (criado do zero, com segredos gerados aqui)
 
-## 2. Ambiente
+Troque `licitall.seudominio.com.br`, o e-mail e a chave do Gemini antes de colar:
 
 ```bash
-cp .env.example .env
-nano .env   # senhas fortes: POSTGRES_PASSWORD, EVOLUTION_API_KEY, OPENAI_API_KEY
+cd /opt/licitall
+cat > .env <<EOF
+APP_ENV=production
+DOMAIN=licitall.seudominio.com.br
+ADMIN_EMAILS=seu@email.com.br
+COOKIE_SECURE=true
+DEBUG=false
+AUTH_REGISTRATION_OPEN=true
+
+POSTGRES_USER=licitall
+POSTGRES_DB=licitall
+POSTGRES_PASSWORD=$(openssl rand -hex 24)
+EVOLUTION_API_KEY=$(openssl rand -hex 32)
+EVOLUTION_SERVER_URL=http://localhost:8081
+
+GEMINI_API_KEY=COLE_SUA_CHAVE_AQUI
+MINHA_RECEITA_PROD_URL=https://minhareceita.org
+INSTALL_DOCLING=false
+EOF
+chmod 600 .env
 ```
 
-Gere uma `EVOLUTION_API_KEY` longa e única. Não commite `.env`.
+- `POSTGRES_PASSWORD` só vale na **primeira** criação do banco. Não troque depois sem `ALTER USER` no Postgres.
+- Guarde uma cópia do `.env` fora do servidor (gerenciador de senhas). Sem ele, os backups não restauram com a mesma
+  senha.
 
-## 3. Infra
+## 4. Subir
 
 ```bash
-docker compose up -d
-docker compose ps
+cd /opt/licitall
+docker compose --profile app up -d --build
+docker compose --profile app ps
+docker compose --profile app logs -f api   # Ctrl+C para sair
 ```
 
-Confirme Postgres healthy e Evolution em `8080`.
+O primeiro build leva alguns minutos. Nos logs da API deve aparecer `Configuração de produção verificada.`,
+`migrações: ok` e o Uvicorn escutando. Se a API recusar subir, o log diz qual variável está fraca ou faltando.
+O Caddy emite o certificado na primeira visita: confira com `docker compose --profile app logs proxy`.
 
-## 4. API
+## 5. Primeiro operador e teste
 
 ```bash
-python3.11 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt -c requirements.lock
-python -m src.db.migrate
-# Docling é pesado; na VPS pode instalar sob demanda na Fase 2
-uvicorn src.main:app --host 0.0.0.0 --port 8000
+docker compose --profile app exec api python -m scripts.criar_usuario \
+  --email seu@email.com.br --nome "Seu Nome" --empresa "Sua Empresa" --admin
+curl -s https://licitall.seudominio.com.br/health
 ```
 
-Produção recomendada: systemd ou container próprio + Caddy/Nginx com TLS.
+Entre em `https://licitall.seudominio.com.br/ui/login.html`. Depois de criar as contas necessárias, considere
+`AUTH_REGISTRATION_OPEN=false` no `.env` e `docker compose --profile app up -d` (cadastro só pelo script).
 
-Exemplo unit systemd (`/etc/systemd/system/licitall.service`):
+## 6. Editais
 
-```ini
-[Unit]
-Description=LicitAll API
-After=network.target docker.service
-
-[Service]
-WorkingDirectory=/opt/licitall
-EnvironmentFile=/opt/licitall/.env
-ExecStart=/opt/licitall/.venv/bin/uvicorn src.main:app --host 127.0.0.1 --port 8000
-Restart=always
-User=www-data
-
-[Install]
-WantedBy=multi-user.target
-```
-
-## 5. Proxy reverso (exemplo Caddy)
-
-```
-api.seudominio.com {
-  reverse_proxy 127.0.0.1:8000
-}
-```
-
-## 6. Smoke test
+Pela tela (menu de operador) ou pelo terminal, por exemplo os abertos da BA dos últimos 7 dias:
 
 ```bash
-curl -s https://api.seudominio.com/health
-curl -s -X POST https://api.seudominio.com/ingestion/pncp/sync \
-  -H 'Content-Type: application/json' \
-  -d '{"uf":"SP","only_open":true}'
+docker compose --profile app exec api python -m scripts.match_empresa_real 05195608000132 --uf BA --sincronizar 7
 ```
 
-## 7. Minha Receita e Evolution
+## 7. WhatsApp (Evolution), quando for usar
 
-- **Minha Receita:** a imagem sobe vazia até carregar o ETL da Receita (processo pesado). Em produção, use volume persistente ou serviço já populado.
-- **Evolution:** abra o manager (`:3000` ou via proxy), crie a instância `licitall` e escaneie o QR.
+O Evolution escuta só em `127.0.0.1:8081` da VPS. Do seu computador, abra um túnel SSH e use o gerenciador:
 
-## Checklist de segurança
+```bash
+ssh -L 8081:127.0.0.1:8081 usuario@IP_DA_VPS
+# no navegador do seu computador: http://localhost:8081/manager  (chave: EVOLUTION_API_KEY do .env da VPS)
+```
 
-- [ ] Senhas e API keys trocadas em relação ao `.env.example`
-- [ ] Postgres/Redis **não** expostos publicamente (bind interno ou firewall)
-- [ ] TLS no reverse proxy
-- [ ] Backup do volume `licitall_pgdata`
-- [ ] Atualizações: `git pull` + `docker compose pull` + restart controlado
+Crie a instância `licitall` e leia o QR Code com o celular.
+
+## 8. Backup diário
+
+```bash
+cd /opt/licitall && sh docker/backup.sh
+(crontab -l 2>/dev/null; echo "0 3 * * * cd /opt/licitall && sh docker/backup.sh >> backups/backup.log 2>&1") | crontab -
+```
+
+Copie a pasta `backups/` para fora do servidor com regularidade: ela contém dados de clientes.
+
+## Atualizar
+
+```bash
+cd /opt/licitall && sh docker/backup.sh && git pull && docker compose --profile app up -d --build
+```
+
+As migrações rodam sozinhas na subida da API.
